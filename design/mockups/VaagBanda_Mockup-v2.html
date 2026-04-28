@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VaagBanda — Working Mockup v4</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #0F2640;
+    font-family: -apple-system, BlinkMacSystemFont, "DM Sans", sans-serif;
+    overflow-x: hidden;
+  }
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, #0F2640 0%, #1B3A5C 40%, #A0102D 100%);
+    color: rgba(255,255,255,0.9);
+    z-index: 9999;
+    transition: opacity 0.4s ease;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  .loading-inner { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(255,255,255,0.2); border-top-color: white;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  .loading-text { font-size: 13px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-inner">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading VaagBanda…</div>
+  </div>
+</div>
+
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+
+const CRIMSON = "#DC143C";
+const CRIMSON_DARK = "#A0102D";
+const CRIMSON_LIGHT = "#F4D0D7";
+const BLUE = "#1B3A5C";
+const BLUE_DARK = "#0F2640";
+const BLUE_LIGHT = "#D5E3F0";
+const BLUE_MID = "#2E5A88";
+const WHITE = "#FFFFFF";
+const GHOST = "#F7F8FC";
+const GRAY100 = "#F1F3F7";
+const GRAY200 = "#E2E6ED";
+const GRAY400 = "#9AA3B3";
+const GRAY600 = "#5A6477";
+const GRAY800 = "#2D3444";
+const SUCCESS = "#27AE60";
+const WARN = "#F39C12";
+
+/* ─── Mock Data ─── */
+const USERS = [
+  { id: "u1", name: "Asim", avatar: "A", color: CRIMSON },
+  { id: "u2", name: "Riya", avatar: "R", color: "#E67E22" },
+  { id: "u3", name: "Kamal", avatar: "K", color: BLUE_MID },
+  { id: "u4", name: "Sita", avatar: "S", color: "#27AE60" },
+];
+const ME = USERS[0];
+
+const INITIAL_GROUPS = [
+  { id: "g1", name: "Nepal Trip 2026", category: "trip", currency: "NPR", emoji: "🏔️", members: ["u1","u2","u3","u4"], expenses: [
+    { id: "e1", desc: "Hotel in Pokhara", amount: 12000, paidBy: "u1", date: "2026-03-15", cat: "accommodation", splits: { u1: 3000, u2: 3000, u3: 3000, u4: 3000 } },
+    { id: "e2", desc: "Dinner at Lakeside", amount: 4800, paidBy: "u2", date: "2026-03-16", cat: "food", splits: { u1: 1200, u2: 1200, u3: 1200, u4: 1200 } },
+    { id: "e3", desc: "Paragliding tickets", amount: 20000, paidBy: "u1", date: "2026-03-17", cat: "entertainment", splits: { u1: 5000, u2: 5000, u3: 5000, u4: 5000 } },
+    { id: "e4", desc: "Bus fare", amount: 3200, paidBy: "u3", date: "2026-03-14", cat: "transport", splits: { u1: 800, u2: 800, u3: 800, u4: 800 } },
+  ], settlements: [
+    { id: "s1", from: "u2", to: "u1", amount: 5000, method: "cash", date: "2026-03-18" }
+  ]},
+  { id: "g2", name: "Apartment Bills", category: "household", currency: "NPR", emoji: "🏠", members: ["u1","u2","u3"], expenses: [
+    { id: "e5", desc: "Electricity March", amount: 3600, paidBy: "u1", date: "2026-03-20", cat: "utilities", splits: { u1: 1200, u2: 1200, u3: 1200 } },
+    { id: "e6", desc: "Wi-Fi bill", amount: 1800, paidBy: "u2", date: "2026-03-22", cat: "utilities", splits: { u1: 600, u2: 600, u3: 600 } },
+  ], settlements: [] },
+  { id: "g3", name: "CyberSquad Lunch", category: "event", currency: "NPR", emoji: "🍕", members: ["u1","u2","u3","u4"], expenses: [
+    { id: "e7", desc: "Pizza order", amount: 2400, paidBy: "u4", date: "2026-04-01", cat: "food", splits: { u1: 600, u2: 600, u3: 600, u4: 600 } },
+  ], settlements: [] },
+];
+
+const CATEGORIES = {
+  food: { icon: "🍽️", label: "Food" },
+  transport: { icon: "🚌", label: "Transport" },
+  accommodation: { icon: "🏨", label: "Accommodation" },
+  entertainment: { icon: "🎭", label: "Entertainment" },
+  utilities: { icon: "💡", label: "Utilities" },
+  other: { icon: "📦", label: "Other" },
+};
+
+const NOTIFICATIONS_DATA = [
+  { id: "n1", text: "Riya added \"Dinner at Lakeside\" — NPR 4,800", time: "2 days ago", read: true, icon: "🍽️" },
+  { id: "n2", text: "Riya settled NPR 5,000 with you (cash)", time: "1 day ago", read: true, icon: "✅" },
+  { id: "n3", text: "Sita added \"Pizza order\" — NPR 2,400", time: "5 hours ago", read: false, icon: "🍕" },
+  { id: "n4", text: "Kamal sent you a payment reminder", time: "2 hours ago", read: false, icon: "🔔" },
+];
+
+/* ─── Utilities ─── */
+const fmt = (n) => Number(n).toLocaleString("en-NP");
+const getUserName = (id) => USERS.find(u => u.id === id)?.name || id;
+const getUserObj = (id) => USERS.find(u => u.id === id);
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+function calcBalances(group) {
+  const bal = {};
+  group.members.forEach(m => bal[m] = 0);
+  group.expenses.forEach(exp => {
+    bal[exp.paidBy] += exp.amount;
+    Object.entries(exp.splits).forEach(([uid, amt]) => { bal[uid] -= amt; });
+  });
+  group.settlements.forEach(s => { bal[s.from] += s.amount; bal[s.to] -= s.amount; });
+  return bal;
+}
+
+/* ─── Icons (inline SVG) ─── */
+const Icon = ({ name, size = 20, color = GRAY600 }) => {
+  const icons = {
+    home: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+    group: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
+    bell: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
+    user: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+    plus: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    back: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>,
+    check: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>,
+    close: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+    camera: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+    flash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+    gallery: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+    rotate: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>,
+    edit: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    calendar: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+    tag: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+    receipt: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 2H8a2 2 0 00-2 2v18l3-2 3 2 3-2 3 2V4a2 2 0 00-2-2z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>,
+    mail: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+    lock: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>,
+    eye: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+    eyeOff: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
+    fingerprint: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 11c0 5-3 7-3 7"/><path d="M14 13c0 2-1 4-1 4"/><path d="M9 4.5C10 4 11 4 12 4c4 0 7 3 7 7v3"/><path d="M5 9c0-2 2-4 4-4.5"/></svg>,
+    sparkle: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.5L19 10l-5.1 1.5L12 17l-1.9-5.5L5 10l5.1-1.5z"/></svg>,
+  };
+  return icons[name] || null;
+};
+
+/* ─── Logo Mark ─── */
+const LogoMark = ({ size = 96, showWordmark = false }) => {
+  const s = size;
+  const stroke = Math.max(2, s * 0.025);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: showWordmark ? s * 0.12 : 0 }}>
+      <svg width={s} height={s} viewBox="0 0 100 100" style={{ display: "block" }}>
+        <g stroke={CRIMSON} strokeWidth={stroke} fill="none" strokeLinecap="round">
+          <path d="M 8 16 L 8 8 L 16 8" />
+          <path d="M 84 8 L 92 8 L 92 16" />
+        </g>
+        <g stroke={BLUE} strokeWidth={stroke} fill="none" strokeLinecap="round">
+          <path d="M 8 84 L 8 92 L 16 92" />
+          <path d="M 84 92 L 92 92 L 92 84" />
+        </g>
+        <rect x="18" y="18" width="64" height="64" rx="10" fill="none" stroke="url(#frameGrad)" strokeWidth={stroke * 0.85} />
+        <g fill={CRIMSON}>
+          <rect x="24" y="24" width="13" height="13" rx="2" />
+          <rect x="27" y="27" width="7" height="7" rx="1" fill={WHITE} />
+          <rect x="29" y="29" width="3" height="3" fill={CRIMSON} />
+        </g>
+        <g fill={BLUE}>
+          <rect x="63" y="24" width="13" height="13" rx="2" />
+          <rect x="66" y="27" width="7" height="7" rx="1" fill={WHITE} />
+          <rect x="68" y="29" width="3" height="3" fill={BLUE} />
+        </g>
+        <g fill={BLUE}>
+          <rect x="24" y="63" width="13" height="13" rx="2" />
+          <rect x="27" y="66" width="7" height="7" rx="1" fill={WHITE} />
+          <rect x="29" y="68" width="3" height="3" fill={BLUE} />
+        </g>
+        <g>
+          <circle cx="44" cy="26" r="1.2" fill={CRIMSON} />
+          <circle cx="48" cy="26" r="1.2" fill={CRIMSON} />
+          <circle cx="54" cy="26" r="1.2" fill={BLUE} />
+          <circle cx="58" cy="26" r="1.2" fill={BLUE} />
+          <circle cx="44" cy="74" r="1.2" fill={CRIMSON} />
+          <circle cx="48" cy="74" r="1.2" fill={BLUE} />
+          <circle cx="54" cy="74" r="1.2" fill={BLUE} />
+          <circle cx="58" cy="74" r="1.2" fill={BLUE} />
+        </g>
+        <path d="M 35 42 L 41 42 L 50 64 L 50 70 L 47 70 L 44 64 L 38 50 Z" fill={CRIMSON}/>
+        <path d="M 50 64 L 50 70 L 53 70 L 53 64 L 51 60 Z" fill={CRIMSON} opacity="0.9"/>
+        <path d="M 56 42 L 60 42 L 70 51 L 60 51 L 60 53 L 71 65 L 60 65 L 56 65 Z" fill={BLUE}/>
+        <defs>
+          <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={CRIMSON}/>
+            <stop offset="100%" stopColor={BLUE}/>
+          </linearGradient>
+        </defs>
+      </svg>
+      {showWordmark && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 800, fontSize: s * 0.32, letterSpacing: -0.5, lineHeight: 1 }}>
+            <span style={{ color: CRIMSON }}>Vaag</span><span style={{ color: BLUE }}>Banda</span>
+          </div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: s * 0.105, letterSpacing: 3, color: GRAY400, marginTop: s * 0.06, textTransform: "uppercase" }}>
+            Scan · Split · Settle
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Avatar ─── */
+const Avatar = ({ user, size = 36 }) => (
+  <div style={{
+    width: size, height: size, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+    background: `linear-gradient(135deg, ${user.color}, ${user.color}CC)`,
+    color: WHITE, fontWeight: 700, fontSize: size * 0.4, fontFamily: "'DM Sans', sans-serif",
+    boxShadow: `0 2px 8px ${user.color}40`, flexShrink: 0,
+  }}>{user.avatar}</div>
+);
+
+/* ─── Phone Frame ─── */
+const PhoneFrame = ({ children }) => (
+  <div style={{
+    width: 390, height: 844, borderRadius: 44, overflow: "hidden", position: "relative",
+    background: GHOST, boxShadow: `0 25px 80px rgba(27,58,92,0.3), 0 8px 30px rgba(220,20,60,0.15), inset 0 0 0 1px rgba(0,0,0,0.08)`,
+    border: `3px solid ${GRAY800}`, display: "flex", flexDirection: "column",
+  }}>
+    <div style={{
+      height: 50, background: BLUE_DARK, display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 28px", color: WHITE, fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+    }}>
+      <span>9:41</span>
+      <div style={{ width: 126, height: 30, borderRadius: 20, background: "#000", position: "absolute", left: "50%", transform: "translateX(-50%)", top: 8 }}/>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ width: 16, height: 10, border: `1px solid ${WHITE}`, borderRadius: 2, position: "relative" }}>
+          <div style={{ width: 10, height: 6, background: WHITE, borderRadius: 1, position: "absolute", left: 2, top: 1 }}/>
+        </div>
+      </div>
+    </div>
+    {children}
+  </div>
+);
+
+/* ─── SPLASH ─── */
+const SplashScreen = ({ onDone }) => {
+  useEffect(() => {
+    const t = setTimeout(() => onDone && onDone(), 2200);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div style={{
+      flex: 1, background: `linear-gradient(160deg, ${BLUE_DARK} 0%, ${BLUE} 45%, ${CRIMSON_DARK} 100%)`,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      position: "relative", overflow: "hidden",
+    }}>
+      <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: `${CRIMSON}25` }}/>
+      <div style={{ position: "absolute", bottom: -80, left: -80, width: 240, height: 240, borderRadius: "50%", background: `${WHITE}10` }}/>
+      <div style={{
+        background: WHITE, padding: 24, borderRadius: 28, boxShadow: `0 25px 60px rgba(0,0,0,0.3)`,
+        animation: "logoIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)", position: "relative", zIndex: 2,
+      }}>
+        <LogoMark size={120} />
+      </div>
+      <div style={{
+        marginTop: 28, color: WHITE, fontSize: 36, fontWeight: 800, fontFamily: "'Playfair Display', serif",
+        letterSpacing: -1, animation: "fadeUp 0.7s ease 0.3s both", position: "relative", zIndex: 2,
+      }}>VaagBanda</div>
+      <div style={{
+        marginTop: 6, color: `${WHITE}90`, fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+        letterSpacing: 5, textTransform: "uppercase", animation: "fadeUp 0.7s ease 0.5s both", position: "relative", zIndex: 2,
+      }}>Scan · Split · Settle</div>
+      <div style={{ position: "absolute", bottom: 80, left: "20%", right: "20%", height: 3, background: `${WHITE}20`, borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ height: "100%", background: WHITE, borderRadius: 2, animation: "loadBar 2.2s ease forwards" }}/>
+      </div>
+      <div style={{ position: "absolute", bottom: 32, color: `${WHITE}50`, fontSize: 10, fontFamily: "'DM Sans', sans-serif", letterSpacing: 1.5 }}>
+        BY CYBERSQUADNP
+      </div>
+      <style>{`
+        @keyframes logoIn { 0% { opacity: 0; transform: scale(0.6); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes loadBar { from { width: 0; } to { width: 100%; } }
+      `}</style>
+    </div>
+  );
+};
+
+/* ─── Shared social-button styles ─── */
+const socialBtnStyle = {
+  flex: 1, padding: "12px",
+  background: WHITE, border: `1.5px solid ${GRAY200}`, borderRadius: 12,
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+  cursor: "pointer", transition: "all 0.2s",
+};
+const socialLabelStyle = { fontSize: 13, fontWeight: 600, color: GRAY800, fontFamily: "'DM Sans', sans-serif" };
+
+/* ─── LOGIN ─── */
+const LoginScreen = ({ onLogin, onGoToSignup }) => {
+  const [email, setEmail] = useState("asim@cybersquadnp.com");
+  const [password, setPassword] = useState("••••••••");
+  const [showPwd, setShowPwd] = useState(false);
+  const [emailFocus, setEmailFocus] = useState(false);
+  const [pwdFocus, setPwdFocus] = useState(false);
+
+  const InputField = ({ icon, type, value, onChange, placeholder, focused, setFocused, suffix }) => (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12, background: WHITE,
+      border: `1.5px solid ${focused ? CRIMSON : GRAY200}`, borderRadius: 14, padding: "14px 16px",
+      transition: "all 0.2s", boxShadow: focused ? `0 0 0 4px ${CRIMSON}15` : "none",
+    }}>
+      <Icon name={icon} size={18} color={focused ? CRIMSON : GRAY400}/>
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: GRAY800, fontWeight: 500 }}
+      />
+      {suffix}
+    </div>
+  );
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: GHOST, overflow: "auto" }}>
+      <div style={{
+        background: `linear-gradient(160deg, ${BLUE_DARK} 0%, ${BLUE} 60%, ${BLUE_MID} 100%)`,
+        padding: "32px 24px 64px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: `${CRIMSON}20` }}/>
+        <div style={{ position: "absolute", bottom: -30, left: -30, width: 120, height: 120, borderRadius: "50%", background: `${WHITE}08` }}/>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 1 }}>
+          <div style={{ background: WHITE, padding: 14, borderRadius: 22, boxShadow: `0 14px 40px rgba(0,0,0,0.25)`, marginBottom: 16 }}>
+            <LogoMark size={72} />
+          </div>
+          <div style={{ color: WHITE, fontSize: 26, fontWeight: 800, fontFamily: "'Playfair Display', serif", letterSpacing: -0.5 }}>Welcome back</div>
+          <div style={{ color: `${WHITE}80`, fontSize: 13, marginTop: 4, fontFamily: "'DM Sans', sans-serif" }}>Sign in to keep your splits in sync</div>
+        </div>
+      </div>
+
+      <div style={{
+        background: WHITE, marginTop: -36, borderRadius: "28px 28px 0 0",
+        padding: "28px 24px 24px", flex: 1, boxShadow: `0 -8px 30px rgba(15,38,64,0.06)`, position: "relative", zIndex: 2,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Email</div>
+        <InputField icon="mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" focused={emailFocus} setFocused={setEmailFocus} />
+        <div style={{ height: 14 }}/>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif" }}>Password</div>
+          <div style={{ fontSize: 11, color: CRIMSON, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Forgot?</div>
+        </div>
+        <InputField icon="lock" type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password"
+          focused={pwdFocus} setFocused={setPwdFocus}
+          suffix={<div onClick={() => setShowPwd(!showPwd)} style={{ cursor: "pointer", display: "flex", alignItems: "center" }}><Icon name={showPwd ? "eyeOff" : "eye"} size={18} color={GRAY400}/></div>}
+        />
+
+        <button onClick={onLogin} style={{
+          width: "100%", marginTop: 20, padding: "16px",
+          background: `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)`,
+          color: WHITE, border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700,
+          fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3, cursor: "pointer",
+          boxShadow: `0 10px 24px ${CRIMSON}40`, transition: "all 0.2s",
+        }}>Sign In</button>
+
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          marginTop: 14, padding: "10px 14px", background: `${BLUE}06`, borderRadius: 12, cursor: "pointer",
+        }}>
+          <Icon name="fingerprint" size={16} color={BLUE}/>
+          <span style={{ fontSize: 12, color: BLUE, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Use Face ID / Fingerprint</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
+          <div style={{ flex: 1, height: 1, background: GRAY200 }}/>
+          <span style={{ fontSize: 11, color: GRAY400, fontWeight: 500, letterSpacing: 1, fontFamily: "'DM Sans', sans-serif" }}>OR CONTINUE WITH</span>
+          <div style={{ flex: 1, height: 1, background: GRAY200 }}/>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={socialBtnStyle}>
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 8 3l5.7-5.7C33.8 6.1 29.1 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 8 3l5.7-5.7C33.8 6.1 29.1 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.6-1.9 13-5l-6-5c-2 1.4-4.4 2-7 2-5.2 0-9.6-3.3-11.3-8L6.1 32.6C9.4 39.6 16.1 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6 5c-.4.4 6.4-4.7 6.4-14.7 0-1.3-.1-2.7-.4-3.9z"/></svg>
+            <span style={socialLabelStyle}>Google</span>
+          </button>
+          <button style={socialBtnStyle}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#000"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+            <span style={socialLabelStyle}>Apple</span>
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 26, fontSize: 13, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>
+          New to VaagBanda?{" "}
+          <span onClick={onGoToSignup} style={{ color: CRIMSON, fontWeight: 700, cursor: "pointer" }}>Create an account</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── SIGNUP ─── */
+const SignUpScreen = ({ onSignup, onGoToLogin }) => {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [agree, setAgree] = useState(true);
+  const [focusedField, setFocusedField] = useState(null);
+
+  const pwdStrength = (() => {
+    if (!password) return { level: 0, label: "", color: GRAY200 };
+    let s = 0;
+    if (password.length >= 8) s++;
+    if (/[A-Z]/.test(password)) s++;
+    if (/[0-9]/.test(password)) s++;
+    if (/[^A-Za-z0-9]/.test(password)) s++;
+    if (password.length >= 12) s++;
+    if (s <= 1) return { level: 1, label: "Weak", color: "#E74C3C" };
+    if (s <= 3) return { level: 2, label: "Good", color: "#F39C12" };
+    return { level: 3, label: "Strong", color: "#27AE60" };
+  })();
+
+  const SignupField = ({ icon, type, value, onChange, placeholder, label, fieldKey, suffix }) => {
+    const focused = focusedField === fieldKey;
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, background: WHITE,
+          border: `1.5px solid ${focused ? CRIMSON : GRAY200}`, borderRadius: 14, padding: "14px 16px",
+          transition: "all 0.2s", boxShadow: focused ? `0 0 0 4px ${CRIMSON}15` : "none",
+        }}>
+          <Icon name={icon} size={18} color={focused ? CRIMSON : GRAY400}/>
+          <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+            onFocus={() => setFocusedField(fieldKey)} onBlur={() => setFocusedField(null)}
+            style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: GRAY800, fontWeight: 500 }}/>
+          {suffix}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: GHOST, overflow: "auto" }}>
+      <div style={{
+        background: `linear-gradient(160deg, ${BLUE_DARK} 0%, ${CRIMSON_DARK} 100%)`,
+        padding: "20px 24px 48px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 130, height: 130, borderRadius: "50%", background: `${WHITE}08` }}/>
+        <div style={{ position: "absolute", bottom: -40, left: -20, width: 100, height: 100, borderRadius: "50%", background: `${CRIMSON}25` }}/>
+        <div onClick={onGoToLogin} style={{ width: 36, height: 36, borderRadius: 10, background: `${WHITE}15`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(10px)" }}>
+          <Icon name="back" size={18} color={WHITE}/>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16, position: "relative", zIndex: 1 }}>
+          <div style={{ background: WHITE, padding: 8, borderRadius: 14, boxShadow: `0 8px 20px rgba(0,0,0,0.2)` }}>
+            <LogoMark size={48} />
+          </div>
+          <div>
+            <div style={{ color: WHITE, fontSize: 22, fontWeight: 800, fontFamily: "'Playfair Display', serif", letterSpacing: -0.3, lineHeight: 1.1 }}>Get started</div>
+            <div style={{ color: `${WHITE}80`, fontSize: 12, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>Track shared expenses with ease</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        background: WHITE, marginTop: -28, borderRadius: "28px 28px 0 0",
+        padding: "24px 24px 20px", flex: 1, boxShadow: `0 -8px 30px rgba(15,38,64,0.06)`, position: "relative", zIndex: 2,
+      }}>
+        <SignupField icon="user" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Asim Maharjan" label="Display Name" fieldKey="name" />
+        <SignupField icon="mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" label="Email Address" fieldKey="email" />
+        <SignupField icon="lock" type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" label="Password" fieldKey="password"
+          suffix={<div onClick={() => setShowPwd(!showPwd)} style={{ cursor: "pointer", display: "flex", alignItems: "center" }}><Icon name={showPwd ? "eyeOff" : "eye"} size={18} color={GRAY400}/></div>}/>
+
+        {password && (
+          <div style={{ marginTop: -6, marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+              {[1,2,3].map(i => (
+                <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= pwdStrength.level ? pwdStrength.color : GRAY200, transition: "all 0.3s" }}/>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: pwdStrength.color, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{pwdStrength.label} password</div>
+          </div>
+        )}
+
+        <div onClick={() => setAgree(!agree)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 8, marginBottom: 18, cursor: "pointer" }}>
+          <div style={{
+            width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+            border: `2px solid ${agree ? CRIMSON : GRAY400}`, background: agree ? CRIMSON : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s", marginTop: 1,
+          }}>
+            {agree && <Icon name="check" size={11} color={WHITE}/>}
+          </div>
+          <span style={{ fontSize: 12, color: GRAY600, lineHeight: 1.5, fontFamily: "'DM Sans', sans-serif" }}>
+            I agree to VaagBanda's <span style={{ color: CRIMSON, fontWeight: 600 }}>Terms of Service</span> and <span style={{ color: CRIMSON, fontWeight: 600 }}>Privacy Policy</span>
+          </span>
+        </div>
+
+        <button onClick={onSignup} disabled={!agree} style={{
+          width: "100%", padding: "16px",
+          background: agree ? `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)` : GRAY200,
+          color: agree ? WHITE : GRAY400, border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700,
+          fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3, cursor: agree ? "pointer" : "not-allowed",
+          boxShadow: agree ? `0 10px 24px ${CRIMSON}40` : "none", transition: "all 0.2s",
+        }}>Create Account</button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 14px" }}>
+          <div style={{ flex: 1, height: 1, background: GRAY200 }}/>
+          <span style={{ fontSize: 11, color: GRAY400, fontWeight: 500, letterSpacing: 1, fontFamily: "'DM Sans', sans-serif" }}>OR SIGN UP WITH</span>
+          <div style={{ flex: 1, height: 1, background: GRAY200 }}/>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={socialBtnStyle}>
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 8 3l5.7-5.7C33.8 6.1 29.1 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3 0 5.8 1.1 8 3l5.7-5.7C33.8 6.1 29.1 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.6-1.9 13-5l-6-5c-2 1.4-4.4 2-7 2-5.2 0-9.6-3.3-11.3-8L6.1 32.6C9.4 39.6 16.1 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6 5c-.4.4 6.4-4.7 6.4-14.7 0-1.3-.1-2.7-.4-3.9z"/></svg>
+            <span style={socialLabelStyle}>Google</span>
+          </button>
+          <button style={socialBtnStyle}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#000"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+            <span style={socialLabelStyle}>Apple</span>
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 22, fontSize: 13, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>
+          Already have an account?{" "}
+          <span onClick={onGoToLogin} style={{ color: CRIMSON, fontWeight: 700, cursor: "pointer" }}>Sign in</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── ADD EXPENSE ─── 
+   Splitwise-inspired layout: hero amount input on top, form rows below,
+   split-method pills, member shares preview, save CTA pinned at bottom.
+   Implements SRS §4.3 — Expense Entry & Splitting. */
+const AddExpenseScreen = ({ groups, defaultGroupId, prefill, onClose, onSave, onOpenScan }) => {
+  const [groupId, setGroupId] = useState(defaultGroupId || groups[0]?.id);
+  const [amount, setAmount] = useState(prefill?.amount ? String(prefill.amount) : "");
+  const [desc, setDesc] = useState(prefill?.desc || "");
+  const [paidBy, setPaidBy] = useState(ME.id);
+  const [date, setDate] = useState(prefill?.date || todayStr());
+  const [cat, setCat] = useState(prefill?.cat || "food");
+  const [splitMethod, setSplitMethod] = useState("equal"); // equal | exact | percent | shares
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const [showCatPicker, setShowCatPicker] = useState(false);
+  const [showPayerPicker, setShowPayerPicker] = useState(false);
+
+  const group = groups.find(g => g.id === groupId);
+  const memberObjs = group ? group.members.map(getUserObj) : [];
+  const numericAmount = parseFloat(amount) || 0;
+
+  // Equal split calculation (with rounding remainder going to payer per SRS §4.3.3)
+  const equalSplits = (() => {
+    if (!group || !numericAmount) return {};
+    const n = group.members.length;
+    const base = Math.floor((numericAmount / n) * 100) / 100;
+    const remainder = Math.round((numericAmount - base * n) * 100) / 100;
+    const splits = {};
+    group.members.forEach((m, i) => {
+      splits[m] = m === paidBy ? base + remainder : base;
+    });
+    return splits;
+  })();
+
+  const canSave = numericAmount > 0 && desc.trim().length > 0 && group;
+
+  const handleSave = () => {
+    if (!canSave) return;
+    const newExpense = {
+      id: "e" + Date.now(),
+      desc: desc.trim(),
+      amount: numericAmount,
+      paidBy,
+      date,
+      cat,
+      splits: equalSplits,
+    };
+    onSave(groupId, newExpense);
+    onClose();
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: GHOST, overflow: "hidden", animation: "slideUp 0.3s ease" }}>
+      {/* Header */}
+      <div style={{
+        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE} 60%, ${BLUE_MID} 100%)`,
+        padding: "16px 20px 24px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: `${CRIMSON}15` }}/>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
+          <div onClick={onClose} style={{
+            width: 36, height: 36, borderRadius: 10, background: `${WHITE}15`,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}>
+            <Icon name="close" size={18} color={WHITE}/>
+          </div>
+          <div style={{ color: WHITE, fontSize: 16, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>New Expense</div>
+          <div onClick={onOpenScan} style={{
+            width: 36, height: 36, borderRadius: 10, background: `${CRIMSON}`,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+            boxShadow: `0 4px 12px ${CRIMSON}50`,
+          }} title="Scan receipt">
+            <Icon name="camera" size={18} color={WHITE}/>
+          </div>
+        </div>
+
+        {/* Amount input */}
+        <div style={{ marginTop: 20, textAlign: "center", position: "relative", zIndex: 1 }}>
+          <div style={{ color: `${WHITE}70`, fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>
+            Amount in {group?.currency || "NPR"}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8 }}>
+            <span style={{ color: `${WHITE}70`, fontSize: 22, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{group?.currency || "NPR"}</span>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              style={{
+                width: 200, background: "transparent", border: "none", outline: "none",
+                color: WHITE, fontSize: 48, fontWeight: 800, textAlign: "center",
+                fontFamily: "'DM Sans', sans-serif", letterSpacing: -1.5,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Form */}
+      <div style={{ flex: 1, overflow: "auto", padding: "16px 20px 100px" }}>
+        {/* Description */}
+        <div style={{
+          background: WHITE, borderRadius: 14, padding: "12px 16px", marginBottom: 10,
+          border: `1px solid ${GRAY100}`,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: `${CRIMSON}10`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="edit" size={16} color={CRIMSON}/>
+            </div>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What was this for?"
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: GRAY800, fontWeight: 500 }}/>
+          </div>
+        </div>
+
+        {/* Group picker */}
+        <div onClick={() => setShowGroupPicker(!showGroupPicker)} style={{
+          background: WHITE, borderRadius: 14, padding: "12px 16px", marginBottom: 10,
+          border: `1px solid ${GRAY100}`, cursor: "pointer",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: `${BLUE}10`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+              {group?.emoji || "👥"}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Group</div>
+              <div style={{ fontSize: 14, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{group?.name}</div>
+            </div>
+            <span style={{ color: GRAY400 }}>›</span>
+          </div>
+          {showGroupPicker && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${GRAY100}` }}>
+              {groups.map(g => (
+                <div key={g.id} onClick={(e) => { e.stopPropagation(); setGroupId(g.id); setShowGroupPicker(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", cursor: "pointer",
+                    borderRadius: 8, ...(g.id === groupId ? { background: `${CRIMSON}10` } : {}),
+                  }}>
+                  <span style={{ fontSize: 18 }}>{g.emoji}</span>
+                  <span style={{ fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: GRAY800, flex: 1 }}>{g.name}</span>
+                  {g.id === groupId && <Icon name="check" size={14} color={CRIMSON}/>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Paid by */}
+        <div onClick={() => setShowPayerPicker(!showPayerPicker)} style={{
+          background: WHITE, borderRadius: 14, padding: "12px 16px", marginBottom: 10,
+          border: `1px solid ${GRAY100}`, cursor: "pointer",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: `${SUCCESS}10`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="user" size={16} color={SUCCESS}/>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Paid by</div>
+              <div style={{ fontSize: 14, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                {paidBy === ME.id ? "You" : getUserName(paidBy)}
+              </div>
+            </div>
+            <span style={{ color: GRAY400 }}>›</span>
+          </div>
+          {showPayerPicker && memberObjs.length > 0 && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${GRAY100}` }}>
+              {memberObjs.map(u => u && (
+                <div key={u.id} onClick={(e) => { e.stopPropagation(); setPaidBy(u.id); setShowPayerPicker(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", cursor: "pointer",
+                    borderRadius: 8, ...(u.id === paidBy ? { background: `${SUCCESS}10` } : {}),
+                  }}>
+                  <Avatar user={u} size={26}/>
+                  <span style={{ fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: GRAY800, flex: 1 }}>
+                    {u.id === ME.id ? "You" : u.name}
+                  </span>
+                  {u.id === paidBy && <Icon name="check" size={14} color={SUCCESS}/>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Category + Date row */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <div onClick={() => setShowCatPicker(!showCatPicker)} style={{
+            flex: 1, background: WHITE, borderRadius: 14, padding: "12px 14px",
+            border: `1px solid ${GRAY100}`, cursor: "pointer",
+          }}>
+            <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>Category</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 16 }}>{CATEGORIES[cat].icon}</span>
+              <span style={{ fontSize: 13, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{CATEGORIES[cat].label}</span>
+            </div>
+          </div>
+          <div style={{
+            flex: 1, background: WHITE, borderRadius: 14, padding: "12px 14px",
+            border: `1px solid ${GRAY100}`,
+          }}>
+            <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>Date</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Icon name="calendar" size={14} color={GRAY600}/>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 13, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}/>
+            </div>
+          </div>
+        </div>
+
+        {showCatPicker && (
+          <div style={{ background: WHITE, borderRadius: 14, padding: "10px", marginBottom: 10, border: `1px solid ${GRAY100}`, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {Object.entries(CATEGORIES).map(([key, c]) => (
+              <div key={key} onClick={() => { setCat(key); setShowCatPicker(false); }}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "10px 4px",
+                  borderRadius: 10, cursor: "pointer",
+                  background: cat === key ? `${CRIMSON}10` : "transparent",
+                  border: `1.5px solid ${cat === key ? CRIMSON : "transparent"}`,
+                }}>
+                <span style={{ fontSize: 20 }}>{c.icon}</span>
+                <span style={{ fontSize: 10, color: cat === key ? CRIMSON : GRAY600, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{c.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Split method */}
+        <div style={{ marginTop: 16, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Split Method</div>
+          <div style={{ display: "flex", gap: 6, background: GRAY100, padding: 4, borderRadius: 12 }}>
+            {[
+              { key: "equal", label: "Equal" },
+              { key: "exact", label: "Exact" },
+              { key: "percent", label: "%" },
+              { key: "shares", label: "Shares" },
+            ].map(opt => (
+              <div key={opt.key} onClick={() => setSplitMethod(opt.key)} style={{
+                flex: 1, padding: "8px", textAlign: "center", borderRadius: 8, cursor: "pointer",
+                fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+                background: splitMethod === opt.key ? WHITE : "transparent",
+                color: splitMethod === opt.key ? CRIMSON : GRAY600,
+                boxShadow: splitMethod === opt.key ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                transition: "all 0.2s",
+              }}>{opt.label}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Member shares preview */}
+        {group && numericAmount > 0 && (
+          <div style={{ background: WHITE, borderRadius: 14, padding: 14, border: `1px solid ${GRAY100}` }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10, fontFamily: "'DM Sans', sans-serif" }}>
+              Each person owes
+            </div>
+            {memberObjs.map(u => u && (
+              <div key={u.id} style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
+                borderBottom: `1px solid ${GRAY100}`,
+              }}>
+                <Avatar user={u} size={28}/>
+                <span style={{ fontSize: 13, color: GRAY800, fontWeight: 500, flex: 1, fontFamily: "'DM Sans', sans-serif" }}>
+                  {u.id === ME.id ? "You" : u.name}
+                </span>
+                <span style={{ fontSize: 14, color: GRAY800, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                  {fmt(equalSplits[u.id] || 0)}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: GRAY600, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Total</span>
+              <span style={{ fontSize: 14, color: CRIMSON, fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>
+                {group.currency} {fmt(numericAmount)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save CTA */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        padding: "14px 20px 18px",
+        background: `linear-gradient(180deg, transparent, ${WHITE} 30%)`,
+      }}>
+        <button onClick={handleSave} disabled={!canSave} style={{
+          width: "100%", padding: "16px",
+          background: canSave ? `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)` : GRAY200,
+          color: canSave ? WHITE : GRAY400, border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700,
+          fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3, cursor: canSave ? "pointer" : "not-allowed",
+          boxShadow: canSave ? `0 10px 24px ${CRIMSON}40` : "none", transition: "all 0.2s",
+        }}>
+          Save Expense
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─── SCAN RECEIPT ─── 
+   Camera-style fullscreen viewport with corner brackets, animated scan line,
+   simulated OCR result drawer that slides up after capture.
+   Implements SRS §3.2 + §4.3 receipt OCR. */
+const ScanReceiptScreen = ({ onClose, onScanComplete }) => {
+  const [scanState, setScanState] = useState("scanning"); // scanning | processing | result
+  const [flashOn, setFlashOn] = useState(false);
+
+  const handleCapture = () => {
+    setScanState("processing");
+    setTimeout(() => setScanState("result"), 1800);
+  };
+
+  const handleConfirm = () => {
+    onScanComplete({
+      desc: "Coffee at Himalayan Java",
+      amount: 1850,
+      date: todayStr(),
+      cat: "food",
+    });
+    onClose();
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#000", overflow: "hidden", animation: "slideUp 0.3s ease" }}>
+      {/* Top bar */}
+      <div style={{
+        padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "rgba(0,0,0,0.4)", backdropFilter: "blur(20px)", zIndex: 5,
+      }}>
+        <div onClick={onClose} style={{
+          width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+        }}>
+          <Icon name="close" size={18} color={WHITE}/>
+        </div>
+        <div style={{ color: WHITE, fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3 }}>
+          Scan Receipt
+        </div>
+        <div onClick={() => setFlashOn(!flashOn)} style={{
+          width: 36, height: 36, borderRadius: "50%",
+          background: flashOn ? CRIMSON : "rgba(255,255,255,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s",
+        }}>
+          <Icon name="flash" size={18} color={WHITE}/>
+        </div>
+      </div>
+
+      {/* Camera viewport */}
+      <div style={{
+        flex: 1, position: "relative", overflow: "hidden",
+        background: `radial-gradient(ellipse at center, #2A2A2A 0%, #0A0A0A 100%)`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {/* Decorative blurred receipt silhouette behind frame */}
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.15,
+          background: `repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(255,255,255,0.1) 4px, rgba(255,255,255,0.1) 5px)`,
+        }}/>
+
+        {/* Mock receipt graphic */}
+        <div style={{
+          width: 200, height: 280, background: `${WHITE}10`, borderRadius: 8, position: "absolute",
+          backdropFilter: "blur(2px)",
+          padding: 16, display: "flex", flexDirection: "column", gap: 6,
+          opacity: scanState === "result" ? 0.4 : 0.7, transition: "opacity 0.4s",
+        }}>
+          <div style={{ height: 8, background: `${WHITE}30`, borderRadius: 2, width: "70%" }}/>
+          <div style={{ height: 4, background: `${WHITE}20`, borderRadius: 2, width: "50%" }}/>
+          <div style={{ height: 1, background: `${WHITE}15`, margin: "8px 0" }}/>
+          <div style={{ height: 4, background: `${WHITE}20`, borderRadius: 2 }}/>
+          <div style={{ height: 4, background: `${WHITE}20`, borderRadius: 2 }}/>
+          <div style={{ height: 4, background: `${WHITE}20`, borderRadius: 2, width: "85%" }}/>
+          <div style={{ height: 4, background: `${WHITE}20`, borderRadius: 2 }}/>
+          <div style={{ height: 1, background: `${WHITE}15`, margin: "8px 0" }}/>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ height: 6, background: `${WHITE}40`, borderRadius: 2, width: 30 }}/>
+            <div style={{ height: 6, background: `${WHITE}40`, borderRadius: 2, width: 50 }}/>
+          </div>
+          <div style={{ marginTop: "auto", height: 32, background: `${WHITE}05`, borderRadius: 4 }}/>
+        </div>
+
+        {/* Scan frame with corner brackets */}
+        <div style={{
+          width: 260, height: 320, position: "relative", zIndex: 2,
+        }}>
+          {/* Corner brackets */}
+          {[
+            { top: 0, left: 0, borderTop: `3px solid ${CRIMSON}`, borderLeft: `3px solid ${CRIMSON}`, borderRadius: "12px 0 0 0" },
+            { top: 0, right: 0, borderTop: `3px solid ${CRIMSON}`, borderRight: `3px solid ${CRIMSON}`, borderRadius: "0 12px 0 0" },
+            { bottom: 0, left: 0, borderBottom: `3px solid ${BLUE_LIGHT}`, borderLeft: `3px solid ${BLUE_LIGHT}`, borderRadius: "0 0 0 12px" },
+            { bottom: 0, right: 0, borderBottom: `3px solid ${BLUE_LIGHT}`, borderRight: `3px solid ${BLUE_LIGHT}`, borderRadius: "0 0 12px 0" },
+          ].map((s, i) => (
+            <div key={i} style={{ position: "absolute", width: 32, height: 32, ...s }}/>
+          ))}
+
+          {/* Animated scan line */}
+          {scanState === "scanning" && (
+            <div style={{
+              position: "absolute", left: 8, right: 8, height: 2,
+              background: `linear-gradient(90deg, transparent, ${CRIMSON}, ${WHITE}, ${CRIMSON}, transparent)`,
+              boxShadow: `0 0 20px ${CRIMSON}, 0 0 40px ${CRIMSON}80`,
+              animation: "scanline 2.4s ease-in-out infinite",
+              borderRadius: 2,
+            }}/>
+          )}
+
+          {/* Processing state */}
+          {scanState === "processing" && (
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 14,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%",
+                border: `4px solid ${WHITE}20`, borderTopColor: CRIMSON,
+                animation: "spin 0.8s linear infinite",
+              }}/>
+              <div style={{ color: WHITE, fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                Reading receipt…
+              </div>
+              <div style={{ color: `${WHITE}70`, fontSize: 11, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: "0 24px" }}>
+                Extracting amount, date, and vendor
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Instruction text */}
+        {scanState === "scanning" && (
+          <div style={{
+            position: "absolute", bottom: 24, left: 24, right: 24, textAlign: "center",
+            color: `${WHITE}90`, fontSize: 12, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5,
+          }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "rgba(0,0,0,0.5)", backdropFilter: "blur(20px)",
+              padding: "10px 16px", borderRadius: 100,
+            }}>
+              <Icon name="sparkle" size={14} color={CRIMSON}/>
+              <span>Align the receipt within the frame</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom controls */}
+      {scanState === "scanning" && (
+        <div style={{
+          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)",
+          padding: "20px 24px 24px", display: "flex", alignItems: "center", justifyContent: "space-around",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.1)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon name="gallery" size={20} color={WHITE}/>
+            </div>
+            <span style={{ color: `${WHITE}80`, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}>Gallery</span>
+          </div>
+
+          {/* Shutter */}
+          <div onClick={handleCapture} style={{
+            width: 76, height: 76, borderRadius: "50%", cursor: "pointer",
+            background: WHITE, padding: 5,
+            boxShadow: `0 0 0 4px ${WHITE}30, 0 0 30px ${CRIMSON}40`,
+          }}>
+            <div style={{
+              width: "100%", height: "100%", borderRadius: "50%",
+              background: `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon name="camera" size={24} color={WHITE}/>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.1)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon name="rotate" size={20} color={WHITE}/>
+            </div>
+            <span style={{ color: `${WHITE}80`, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}>Flip</span>
+          </div>
+        </div>
+      )}
+
+      {/* Result drawer */}
+      {scanState === "result" && (
+        <div style={{
+          background: WHITE, borderRadius: "24px 24px 0 0",
+          padding: "20px 20px 22px", animation: "slideUp 0.35s ease",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: `linear-gradient(135deg, ${SUCCESS}, #1E8E47)`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 4px 12px ${SUCCESS}40`,
+            }}>
+              <Icon name="check" size={18} color={WHITE}/>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>Receipt scanned</div>
+              <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Review the extracted details</div>
+            </div>
+            <div style={{
+              padding: "4px 10px", borderRadius: 100, background: `${CRIMSON}10`,
+              fontSize: 10, color: CRIMSON, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.5,
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              <Icon name="sparkle" size={10} color={CRIMSON}/>
+              <span>OCR</span>
+            </div>
+          </div>
+
+          {/* Extracted fields */}
+          <div style={{ background: GHOST, borderRadius: 14, padding: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${GRAY200}` }}>
+              <span style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Vendor</span>
+              <span style={{ fontSize: 13, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Himalayan Java Coffee</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${GRAY200}` }}>
+              <span style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Date</span>
+              <span style={{ fontSize: 13, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{todayStr()}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${GRAY200}` }}>
+              <span style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Category</span>
+              <span style={{ fontSize: 13, color: GRAY800, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>🍽️ Food</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0" }}>
+              <span style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Total</span>
+              <span style={{ fontSize: 18, color: CRIMSON, fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>NPR 1,850</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button onClick={() => setScanState("scanning")} style={{
+              flex: 1, padding: 13, background: GRAY100, color: GRAY800,
+              border: "none", borderRadius: 12, fontSize: 13, fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+            }}>Retake</button>
+            <button onClick={handleConfirm} style={{
+              flex: 2, padding: 13,
+              background: `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)`,
+              color: WHITE, border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700,
+              fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+              boxShadow: `0 8px 18px ${CRIMSON}40`,
+            }}>Use these details →</button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes scanline {
+          0%, 100% { top: 8%; }
+          50% { top: 92%; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+/* ─── TabBar ─── */
+const TabBar = ({ active, onNavigate, onAddPress }) => {
+  const tabs = [
+    { key: "home", icon: "home", label: "Home" },
+    { key: "groups", icon: "group", label: "Groups" },
+    { key: "fab", isFab: true },
+    { key: "notifications", icon: "bell", label: "Activity" },
+    { key: "profile", icon: "user", label: "Profile" },
+  ];
+  return (
+    <div style={{
+      height: 76, background: WHITE, borderTop: `1px solid ${GRAY200}`, display: "flex",
+      alignItems: "center", justifyContent: "space-around", flexShrink: 0, paddingBottom: 8,
+      position: "relative",
+    }}>
+      {tabs.map(t => {
+        if (t.isFab) {
+          return (
+            <button key={t.key} onClick={onAddPress} style={{
+              background: `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)`,
+              border: `4px solid ${WHITE}`, borderRadius: "50%", width: 58, height: 58,
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              marginTop: -28, boxShadow: `0 8px 20px ${CRIMSON}55`, transition: "transform 0.2s",
+            }}>
+              <Icon name="plus" size={26} color={WHITE}/>
+            </button>
+          );
+        }
+        return (
+          <button key={t.key} onClick={() => onNavigate(t.key)} style={{
+            background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 3, padding: "6px 12px", borderRadius: 12,
+            transition: "all 0.2s",
+            ...(active === t.key ? { background: `${CRIMSON}12` } : {}),
+          }}>
+            <div style={{ position: "relative" }}>
+              <Icon name={t.icon} size={22} color={active === t.key ? CRIMSON : GRAY400} />
+              {t.key === "notifications" && (
+                <div style={{
+                  position: "absolute", top: -3, right: -5, width: 8, height: 8, borderRadius: "50%",
+                  background: CRIMSON, border: `2px solid ${WHITE}`,
+                }}/>
+              )}
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: active === t.key ? 700 : 500, letterSpacing: 0.3,
+              color: active === t.key ? CRIMSON : GRAY400, fontFamily: "'DM Sans', sans-serif",
+            }}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ─── HOME ─── */
+const HomeScreen = ({ groups, onGroupTap, onQuickAdd, onQuickScan, onNewGroup }) => {
+  const totalOwed = groups.reduce((acc, g) => {
+    const bal = calcBalances(g);
+    return acc + (bal[ME.id] || 0);
+  }, 0);
+
+  return (
+    <div style={{ flex: 1, overflow: "auto" }}>
+      <div style={{
+        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE} 60%, ${BLUE_MID} 100%)`,
+        padding: "20px 24px 28px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: `${CRIMSON}15` }}/>
+        <div style={{ position: "absolute", bottom: -20, left: -20, width: 80, height: 80, borderRadius: "50%", background: `${WHITE}08` }}/>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <Avatar user={ME} size={42} />
+          <div>
+            <div style={{ color: `${WHITE}90`, fontSize: 12, fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.5 }}>Welcome back</div>
+            <div style={{ color: WHITE, fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>{ME.name}</div>
+          </div>
+        </div>
+        <div style={{
+          background: `${WHITE}12`, borderRadius: 16, padding: "18px 20px", backdropFilter: "blur(10px)",
+          border: `1px solid ${WHITE}15`,
+        }}>
+          <div style={{ color: `${WHITE}80`, fontSize: 11, fontFamily: "'DM Sans', sans-serif", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Overall Balance</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={{ color: WHITE, fontSize: 32, fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>
+              {totalOwed >= 0 ? "+" : ""}{fmt(totalOwed)}
+            </span>
+            <span style={{ color: `${WHITE}70`, fontSize: 14, fontFamily: "'DM Sans', sans-serif" }}>NPR</span>
+          </div>
+          <div style={{ color: `${WHITE}80`, fontSize: 12, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
+            {totalOwed >= 0 ? "You are owed across all groups" : "You owe across all groups"}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick action shortcuts */}
+      <div style={{ padding: "16px 20px 0", display: "flex", gap: 10 }}>
+        <div onClick={onQuickAdd} style={{
+          flex: 1, background: WHITE, borderRadius: 14, padding: "14px",
+          border: `1px solid ${GRAY100}`, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: `linear-gradient(135deg, ${CRIMSON}, ${CRIMSON_DARK})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Icon name="plus" size={18} color={WHITE}/>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>Add expense</div>
+            <div style={{ fontSize: 10, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Manual entry</div>
+          </div>
+        </div>
+        <div onClick={onQuickScan} style={{
+          flex: 1, background: WHITE, borderRadius: 14, padding: "14px",
+          border: `1px solid ${GRAY100}`, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Icon name="camera" size={18} color={WHITE}/>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>Scan receipt</div>
+            <div style={{ fontSize: 10, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>Auto-extract</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", color: GRAY800, margin: 0 }}>Your Groups</h3>
+          <span onClick={onNewGroup} style={{ fontSize: 12, color: CRIMSON, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>+ New Group</span>
+        </div>
+        {groups.map(g => {
+          const bal = calcBalances(g);
+          const myBal = bal[ME.id] || 0;
+          return (
+            <div key={g.id} onClick={() => onGroupTap(g.id)} style={{
+              background: WHITE, borderRadius: 16, padding: "14px 16px", marginBottom: 10,
+              display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+              border: `1px solid ${GRAY100}`, transition: "all 0.2s",
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14, background: `linear-gradient(135deg, ${BLUE_LIGHT}, ${WHITE})`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0,
+                border: `1px solid ${GRAY200}`,
+              }}>{g.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>{g.name}</div>
+                <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
+                  {g.members.length} members · {g.expenses.length} expenses
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{
+                  fontSize: 14, fontWeight: 800, fontFamily: "'DM Sans', sans-serif",
+                  color: myBal >= 0 ? SUCCESS : CRIMSON,
+                }}>{myBal >= 0 ? "+" : ""}{fmt(myBal)}</div>
+                <div style={{ fontSize: 10, color: GRAY400, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 0.5 }}>NPR</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const GroupDetailScreen = ({ group, onBack, onAddExpense, onSettle, onSettleExpense }) => {
+  const [tab, setTab] = useState("expenses"); // expenses | balances
+  const balances = calcBalances(group);
+  const myBal = balances[ME.id] || 0;
+
+  return (
+    <div style={{ flex: 1, overflow: "auto", background: GHOST }}>
+      <div style={{
+        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE} 100%)`,
+        padding: "20px 24px 28px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div onClick={onBack} style={{
+            width: 36, height: 36, borderRadius: 10, background: `${WHITE}15`,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}>
+            <Icon name="back" size={18} color={WHITE}/>
+          </div>
+          <div onClick={onAddExpense} style={{
+            padding: "8px 14px", borderRadius: 10, background: CRIMSON,
+            display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+            boxShadow: `0 4px 12px ${CRIMSON}50`,
+          }}>
+            <Icon name="plus" size={16} color={WHITE}/>
+            <span style={{ color: WHITE, fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Add</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+          <div style={{ fontSize: 36 }}>{group.emoji}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: WHITE, fontSize: 22, fontWeight: 800, fontFamily: "'Playfair Display', serif" }}>{group.name}</div>
+            <div style={{ color: `${WHITE}80`, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+              {group.members.length} members · {group.currency}
+            </div>
+          </div>
+        </div>
+
+        {/* Balance summary card */}
+        <div style={{
+          marginTop: 16, background: `${WHITE}12`, borderRadius: 14,
+          padding: "12px 14px", backdropFilter: "blur(10px)",
+          border: `1px solid ${WHITE}15`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ color: `${WHITE}80`, fontSize: 10, fontFamily: "'DM Sans', sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>Your balance</div>
+            <div style={{
+              color: WHITE, fontSize: 18, fontWeight: 800,
+              fontFamily: "'DM Sans', sans-serif",
+            }}>
+              {myBal >= 0 ? "+" : ""}{fmt(myBal)} <span style={{ fontSize: 11, opacity: 0.7 }}>{group.currency}</span>
+            </div>
+            <div style={{ color: `${WHITE}70`, fontSize: 10, fontFamily: "'DM Sans', sans-serif", marginTop: 1 }}>
+              {myBal > 0 ? "Others owe you" : myBal < 0 ? "You owe others" : "All settled up"}
+            </div>
+          </div>
+          <button onClick={onSettle} style={{
+            padding: "10px 16px", border: "none",
+            borderRadius: 10, background: WHITE, color: BLUE_DARK,
+            fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
+            cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+            boxShadow: `0 4px 12px rgba(0,0,0,0.15)`,
+          }}>
+            <Icon name="check" size={14} color={SUCCESS}/>
+            Settle up
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{
+        display: "flex", padding: "0 20px", marginTop: 4,
+        borderBottom: `1px solid ${GRAY200}`, background: WHITE,
+      }}>
+        {[
+          { key: "expenses", label: "Expenses" },
+          { key: "balances", label: "Balances" },
+        ].map(t => (
+          <div key={t.key} onClick={() => setTab(t.key)} style={{
+            flex: 1, textAlign: "center", padding: "12px 0", cursor: "pointer",
+            borderBottom: tab === t.key ? `2px solid ${CRIMSON}` : "2px solid transparent",
+            color: tab === t.key ? CRIMSON : GRAY600,
+            fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
+            transition: "all 0.2s",
+          }}>{t.label}</div>
+        ))}
+      </div>
+
+      {tab === "expenses" && (
+        <div style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif", marginBottom: 12, letterSpacing: 0.3 }}>Recent Expenses</h3>
+          {group.expenses.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 20px", background: WHITE, borderRadius: 14, border: `1px solid ${GRAY100}` }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📭</div>
+              <div style={{ fontSize: 13, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>No expenses yet. Tap Add to get started.</div>
+            </div>
+          ) : group.expenses.map(e => {
+            const cat = CATEGORIES[e.cat] || CATEGORIES.other;
+            const isMine = e.paidBy === ME.id;
+            return (
+              <div key={e.id} style={{
+                background: WHITE, borderRadius: 14, padding: 14, marginBottom: 10,
+                border: `1px solid ${GRAY100}`,
+                transition: "border-color 0.2s",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ fontSize: 22 }}>{cat.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: GRAY800, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.desc}</div>
+                    <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
+                      {isMine ? "You" : getUserName(e.paidBy)} paid · {e.date}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>
+                      {fmt(e.amount)}
+                    </div>
+                    <div style={{ fontSize: 9, color: GRAY400, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'DM Sans', sans-serif" }}>{group.currency}</div>
+                  </div>
+                  <button onClick={() => onSettleExpense(e)} style={{
+                    border: "none", cursor: "pointer",
+                    padding: "8px 12px", borderRadius: 10,
+                    background: `linear-gradient(135deg, ${SUCCESS} 0%, #1E8E47 100%)`,
+                    color: WHITE, fontSize: 11, fontWeight: 700,
+                    fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
+                    display: "flex", alignItems: "center", gap: 4,
+                    boxShadow: `0 4px 10px ${SUCCESS}40`,
+                  }} title="Record a settlement for this expense">
+                    <Icon name="check" size={12} color={WHITE}/>
+                    Settle
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "balances" && (
+        <div style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif", marginBottom: 12, letterSpacing: 0.3 }}>Member Balances</h3>
+          {group.members.map(uid => {
+            const u = getUserObj(uid);
+            const b = balances[uid] || 0;
+            const isMe = uid === ME.id;
+            return (
+              <div key={uid} style={{
+                background: WHITE, borderRadius: 14, padding: 14, marginBottom: 10,
+                display: "flex", alignItems: "center", gap: 12, border: `1px solid ${GRAY100}`,
+              }}>
+                <Avatar user={u} size={36}/>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>
+                    {isMe ? "You" : u.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
+                    {b > 0 ? "Gets back" : b < 0 ? "Owes" : "Settled up"}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{
+                    fontSize: 14, fontWeight: 800, fontFamily: "'DM Sans', sans-serif",
+                    color: b > 0 ? SUCCESS : b < 0 ? CRIMSON : GRAY600,
+                  }}>
+                    {b >= 0 ? "+" : ""}{fmt(b)}
+                  </div>
+                  <div style={{ fontSize: 9, color: GRAY400, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'DM Sans', sans-serif" }}>{group.currency}</div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Settle CTA inside balances tab */}
+          <button onClick={onSettle} style={{
+            width: "100%", marginTop: 14, padding: 14,
+            background: `linear-gradient(135deg, ${SUCCESS} 0%, #1E8E47 100%)`,
+            color: WHITE, border: "none", borderRadius: 12,
+            fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            boxShadow: `0 8px 18px ${SUCCESS}40`,
+          }}>
+            <Icon name="check" size={16} color={WHITE}/>
+            Record a settlement
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── CREATE GROUP ─── 
+   Working group-creation flow. User picks an emoji, name, currency, category,
+   selects members from the contact list, and on save the new group is added
+   to state with empty expenses & settlements. Implements SRS §4.2 — Group Management. */
+const CreateGroupScreen = ({ onClose, onCreate }) => {
+  const EMOJI_OPTIONS = ["🏔️","🏠","🍕","✈️","🎬","🎂","🏖️","🚗","🎓","💼","🎉","🛒"];
+  const CURRENCY_OPTIONS = ["NPR","USD","EUR","INR","KRW"];
+  const CATEGORY_OPTIONS = [
+    { key: "trip", label: "Trip" },
+    { key: "household", label: "Household" },
+    { key: "event", label: "Event" },
+    { key: "couple", label: "Couple" },
+    { key: "other", label: "Other" },
+  ];
+
+  const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState("🏔️");
+  const [currency, setCurrency] = useState("NPR");
+  const [category, setCategory] = useState("trip");
+  const [selectedMembers, setSelectedMembers] = useState([ME.id]); // creator pre-selected
+  const [nameFocus, setNameFocus] = useState(false);
+
+  const toggleMember = (id) => {
+    if (id === ME.id) return; // can't deselect self
+    setSelectedMembers(prev =>
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const canCreate = name.trim().length > 0 && selectedMembers.length >= 2;
+
+  const handleCreate = () => {
+    if (!canCreate) return;
+    const newGroup = {
+      id: "g" + Date.now(),
+      name: name.trim(),
+      category,
+      currency,
+      emoji,
+      members: selectedMembers,
+      expenses: [],
+      settlements: [],
+    };
+    onCreate(newGroup);
+    onClose();
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: GHOST, overflow: "hidden", animation: "slideUp 0.3s ease" }}>
+      {/* Header */}
+      <div style={{
+        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE} 60%, ${CRIMSON_DARK} 100%)`,
+        padding: "16px 20px 28px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 130, height: 130, borderRadius: "50%", background: `${WHITE}10` }}/>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
+          <div onClick={onClose} style={{
+            width: 36, height: 36, borderRadius: 10, background: `${WHITE}15`,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}>
+            <Icon name="close" size={18} color={WHITE}/>
+          </div>
+          <div style={{ color: WHITE, fontSize: 16, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>New Group</div>
+          <div style={{ width: 36 }}/>
+        </div>
+
+        {/* Selected emoji preview */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 14, position: "relative", zIndex: 1 }}>
+          <div style={{
+            width: 76, height: 76, borderRadius: 22, background: WHITE,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40,
+            boxShadow: `0 10px 30px rgba(0,0,0,0.25)`, marginBottom: 8,
+          }}>{emoji}</div>
+          <div style={{ color: `${WHITE}80`, fontSize: 11, fontFamily: "'DM Sans', sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+            Tap below to change icon
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: "16px 20px 100px" }}>
+        {/* Emoji picker */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8,
+          background: WHITE, borderRadius: 14, padding: 12,
+          border: `1px solid ${GRAY100}`, marginBottom: 14,
+        }}>
+          {EMOJI_OPTIONS.map(em => (
+            <div key={em} onClick={() => setEmoji(em)} style={{
+              aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 22, cursor: "pointer", borderRadius: 10,
+              background: emoji === em ? `${CRIMSON}15` : "transparent",
+              border: `1.5px solid ${emoji === em ? CRIMSON : "transparent"}`,
+              transition: "all 0.15s",
+            }}>{em}</div>
+          ))}
+        </div>
+
+        {/* Name */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Group Name</div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, background: WHITE,
+          border: `1.5px solid ${nameFocus ? CRIMSON : GRAY200}`, borderRadius: 14, padding: "14px 16px",
+          transition: "all 0.2s", boxShadow: nameFocus ? `0 0 0 4px ${CRIMSON}15` : "none", marginBottom: 14,
+        }}>
+          <Icon name="tag" size={18} color={nameFocus ? CRIMSON : GRAY400}/>
+          <input
+            value={name} onChange={(e) => setName(e.target.value)}
+            onFocus={() => setNameFocus(true)} onBlur={() => setNameFocus(false)}
+            placeholder="e.g. Bali Trip 2026"
+            style={{
+              flex: 1, border: "none", outline: "none", background: "transparent",
+              fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: GRAY800, fontWeight: 500,
+            }}
+          />
+        </div>
+
+        {/* Currency + Category */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Currency</div>
+            <div style={{
+              display: "flex", flexWrap: "wrap", gap: 6,
+              background: WHITE, padding: 6, borderRadius: 12, border: `1px solid ${GRAY100}`,
+            }}>
+              {CURRENCY_OPTIONS.map(c => (
+                <div key={c} onClick={() => setCurrency(c)} style={{
+                  padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                  fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
+                  background: currency === c ? `${CRIMSON}` : "transparent",
+                  color: currency === c ? WHITE : GRAY600,
+                  transition: "all 0.15s",
+                }}>{c}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Category</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {CATEGORY_OPTIONS.map(c => (
+              <div key={c.key} onClick={() => setCategory(c.key)} style={{
+                padding: "8px 14px", borderRadius: 100, cursor: "pointer",
+                fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+                background: category === c.key ? CRIMSON : WHITE,
+                color: category === c.key ? WHITE : GRAY800,
+                border: `1px solid ${category === c.key ? CRIMSON : GRAY200}`,
+                transition: "all 0.15s",
+              }}>{c.label}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Members */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>
+          Members <span style={{ color: CRIMSON, marginLeft: 4 }}>({selectedMembers.length})</span>
+        </div>
+        <div style={{ background: WHITE, borderRadius: 14, border: `1px solid ${GRAY100}`, overflow: "hidden" }}>
+          {USERS.map((u, i) => {
+            const selected = selectedMembers.includes(u.id);
+            const isMe = u.id === ME.id;
+            return (
+              <div key={u.id} onClick={() => toggleMember(u.id)} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+                borderBottom: i < USERS.length - 1 ? `1px solid ${GRAY100}` : "none",
+                cursor: isMe ? "default" : "pointer",
+                background: selected ? `${CRIMSON}06` : "transparent",
+                transition: "background 0.15s",
+              }}>
+                <Avatar user={u} size={36}/>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>
+                    {isMe ? "You" : u.name} {isMe && <span style={{ fontSize: 10, color: GRAY400, fontWeight: 500 }}>· creator</span>}
+                  </div>
+                </div>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 6,
+                  border: `2px solid ${selected ? CRIMSON : GRAY400}`,
+                  background: selected ? CRIMSON : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                  opacity: isMe ? 0.5 : 1,
+                }}>
+                  {selected && <Icon name="check" size={13} color={WHITE}/>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {selectedMembers.length < 2 && (
+          <div style={{ fontSize: 11, color: WARN, fontFamily: "'DM Sans', sans-serif", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            ⚠ Select at least one other member
+          </div>
+        )}
+      </div>
+
+      {/* Save CTA */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        padding: "14px 20px 18px", background: `linear-gradient(180deg, transparent, ${WHITE} 30%)`,
+      }}>
+        <button onClick={handleCreate} disabled={!canCreate} style={{
+          width: "100%", padding: "16px",
+          background: canCreate ? `linear-gradient(135deg, ${CRIMSON} 0%, ${CRIMSON_DARK} 100%)` : GRAY200,
+          color: canCreate ? WHITE : GRAY400, border: "none", borderRadius: 14,
+          fontSize: 15, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
+          letterSpacing: 0.3, cursor: canCreate ? "pointer" : "not-allowed",
+          boxShadow: canCreate ? `0 10px 24px ${CRIMSON}40` : "none", transition: "all 0.2s",
+        }}>
+          Create Group
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─── SETTLE UP ─── 
+   Working settlement flow. Lists all the people the user owes (or is owed by)
+   in this group, lets the user pick one + payment method + amount, and on save
+   adds a settlement record that updates balances. Implements SRS §4.5 — Settlement. */
+const SettleUpScreen = ({ group, expensePrefill, onClose, onSettle }) => {
+  const balances = calcBalances(group);
+  const myBal = balances[ME.id] || 0;
+
+  // Determine who I owe (negative) and who owes me (positive).
+  // For settlement we list the *opposite-sign* members vs. me so we can settle.
+  const candidates = group.members
+    .filter(uid => uid !== ME.id)
+    .map(uid => ({ user: getUserObj(uid), balance: balances[uid] || 0 }))
+    .filter(c => c.balance !== 0);
+
+  // If launched from a specific expense, default the target to that expense's payer
+  // (and prefill the amount with the user's share of that expense).
+  const initialTargetId = (() => {
+    if (expensePrefill && expensePrefill.paidBy && expensePrefill.paidBy !== ME.id) {
+      const inCandidates = candidates.find(c => c.user.id === expensePrefill.paidBy);
+      if (inCandidates) return expensePrefill.paidBy;
+    }
+    return candidates[0]?.user.id || null;
+  })();
+  const initialAmount = (() => {
+    if (expensePrefill && expensePrefill.splits && expensePrefill.splits[ME.id] != null) {
+      return String(expensePrefill.splits[ME.id]);
+    }
+    return "";
+  })();
+  const [targetId, setTargetId] = useState(initialTargetId);
+  const [method, setMethod] = useState("cash"); // cash | bank | upi | esewa | khalti | other
+  const [amount, setAmount] = useState(initialAmount);
+
+  const target = candidates.find(c => c.user.id === targetId);
+  const targetBal = target?.balance || 0;
+  // If target has positive balance (others owe me), settling means they pay me.
+  // If target has negative balance, I owe them and I pay.
+  const direction = targetBal > 0 ? "incoming" : "outgoing";
+  const suggestedAmount = Math.abs(targetBal);
+
+  // Pre-fill amount when target changes
+  useEffect(() => {
+    if (target) setAmount(String(suggestedAmount));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId]);
+
+  const numericAmount = parseFloat(amount) || 0;
+  const canSettle = target && numericAmount > 0;
+
+  const METHODS = [
+    { key: "cash", label: "Cash", emoji: "💵" },
+    { key: "bank", label: "Bank", emoji: "🏦" },
+    { key: "upi", label: "UPI", emoji: "📱" },
+    { key: "esewa", label: "eSewa", emoji: "💚" },
+    { key: "khalti", label: "Khalti", emoji: "💜" },
+    { key: "other", label: "Other", emoji: "✨" },
+  ];
+
+  const handleSettle = () => {
+    if (!canSettle) return;
+    const settlement = {
+      id: "s" + Date.now(),
+      from: direction === "incoming" ? target.user.id : ME.id,
+      to:   direction === "incoming" ? ME.id : target.user.id,
+      amount: numericAmount,
+      method,
+      date: todayStr(),
+    };
+    onSettle(group.id, settlement);
+    onClose();
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: GHOST, overflow: "hidden", animation: "slideUp 0.3s ease" }}>
+      {/* Header */}
+      <div style={{
+        background: `linear-gradient(135deg, #1E8E47 0%, ${SUCCESS} 60%, ${BLUE_MID} 100%)`,
+        padding: "16px 20px 28px", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 130, height: 130, borderRadius: "50%", background: `${WHITE}12` }}/>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
+          <div onClick={onClose} style={{
+            width: 36, height: 36, borderRadius: 10, background: `${WHITE}15`,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}>
+            <Icon name="close" size={18} color={WHITE}/>
+          </div>
+          <div style={{ color: WHITE, fontSize: 16, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Settle Up</div>
+          <div style={{ width: 36 }}/>
+        </div>
+        <div style={{ marginTop: 14, position: "relative", zIndex: 1 }}>
+          <div style={{ color: `${WHITE}80`, fontSize: 11, fontFamily: "'DM Sans', sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>In {group.name}</div>
+          <div style={{ color: WHITE, fontSize: 24, fontWeight: 800, fontFamily: "'Playfair Display', serif", marginTop: 4 }}>
+            {myBal === 0 ? "You're all settled up" :
+             myBal > 0 ? `You're owed ${fmt(myBal)}` :
+             `You owe ${fmt(Math.abs(myBal))}`}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: "16px 20px 100px" }}>
+        {expensePrefill && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+            background: `linear-gradient(135deg, ${SUCCESS}10, ${BLUE}06)`,
+            border: `1px dashed ${SUCCESS}50`, borderRadius: 12, marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 18 }}>{(CATEGORIES[expensePrefill.cat] || CATEGORIES.other).icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.4 }}>SETTLING FOR</div>
+              <div style={{ fontSize: 13, color: GRAY800, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {expensePrefill.desc}
+              </div>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: SUCCESS, fontFamily: "'DM Sans', sans-serif" }}>
+              {fmt(expensePrefill.amount)}
+            </div>
+          </div>
+        )}
+        {candidates.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>All clear!</div>
+            <div style={{ fontSize: 13, color: GRAY600, fontFamily: "'DM Sans', sans-serif" }}>
+              Nobody in this group owes anyone right now.
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Pick person */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Settle with</div>
+            <div style={{ background: WHITE, borderRadius: 14, border: `1px solid ${GRAY100}`, overflow: "hidden", marginBottom: 16 }}>
+              {candidates.map((c, i) => {
+                const sel = c.user.id === targetId;
+                return (
+                  <div key={c.user.id} onClick={() => setTargetId(c.user.id)} style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+                    borderBottom: i < candidates.length - 1 ? `1px solid ${GRAY100}` : "none",
+                    background: sel ? `${SUCCESS}08` : "transparent",
+                    cursor: "pointer", transition: "background 0.15s",
+                  }}>
+                    <Avatar user={c.user} size={36}/>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: GRAY800, fontFamily: "'DM Sans', sans-serif" }}>{c.user.name}</div>
+                      <div style={{ fontSize: 11, color: GRAY600, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
+                        {c.balance > 0 ? "Owes you" : "You owe them"}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 800, fontFamily: "'DM Sans', sans-serif",
+                        color: c.balance > 0 ? SUCCESS : CRIMSON,
+                      }}>
+                        {c.balance >= 0 ? "+" : ""}{fmt(c.balance)}
+                      </div>
+                      <div style={{ fontSize: 9, color: GRAY400, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'DM Sans', sans-serif" }}>{group.currency}</div>
+                    </div>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%",
+                      border: `2px solid ${sel ? SUCCESS : GRAY400}`,
+                      background: sel ? SUCCESS : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      marginLeft: 4,
+                    }}>
+                      {sel && <Icon name="check" size={12} color={WHITE}/>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Amount */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Amount</div>
+            <div style={{
+              background: WHITE, borderRadius: 14, border: `1px solid ${GRAY100}`,
+              padding: "14px 16px", marginBottom: 16,
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ fontSize: 14, color: GRAY600, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{group.currency}</span>
+              <input
+                type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                style={{
+                  flex: 1, border: "none", outline: "none", background: "transparent",
+                  fontSize: 22, fontWeight: 800, color: GRAY800, fontFamily: "'DM Sans', sans-serif",
+                  letterSpacing: -0.5,
+                }}
+              />
+              {target && numericAmount !== suggestedAmount && (
+                <div onClick={() => setAmount(String(suggestedAmount))} style={{
+                  padding: "4px 10px", borderRadius: 8, background: `${SUCCESS}15`,
+                  fontSize: 10, color: SUCCESS, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}>
+                  Full ({fmt(suggestedAmount)})
+                </div>
+              )}
+            </div>
+
+            {/* Method */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: GRAY600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Payment Method</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {METHODS.map(m => (
+                <div key={m.key} onClick={() => setMethod(m.key)} style={{
+                  padding: "12px 6px", borderRadius: 12, textAlign: "center", cursor: "pointer",
+                  background: method === m.key ? `${SUCCESS}10` : WHITE,
+                  border: `1.5px solid ${method === m.key ? SUCCESS : GRAY200}`,
+                  transition: "all 0.15s",
+                }}>
+                  <div style={{ fontSize: 22, marginBottom: 2 }}>{m.emoji}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: method === m.key ? SUCCESS : GRAY800, fontFamily: "'DM Sans', sans-serif" }}>{m.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary */}
+            {target && numericAmount > 0 && (
+              <div style={{
+                marginTop: 18, padding: "12px 14px", borderRadius: 12,
+                background: `linear-gradient(135deg, ${SUCCESS}10, ${BLUE}05)`,
+                border: `1px dashed ${SUCCESS}50`,
+                fontSize: 12, color: GRAY800, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6,
+              }}>
+                {direction === "incoming"
+                  ? <span><b>{target.user.name}</b> pays <b>you</b> {group.currency} {fmt(numericAmount)}</span>
+                  : <span><b>You</b> pay <b>{target.user.name}</b> {group.currency} {fmt(numericAmount)}</span>}
+                <div style={{ fontSize: 10, color: GRAY600, marginTop: 4 }}>
+                  via {METHODS.find(m => m.key === method)?.label} · recorded only — no real payment is processed
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Save CTA */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        padding: "14px 20px 18px", background: `linear-gradient(180deg, transparent, ${WHITE} 30%)`,
+      }}>
+        <button onClick={candidates.length === 0 ? onClose : handleSettle} disabled={candidates.length > 0 && !canSettle} style={{
+          width: "100%", padding: "16px",
+          background: candidates.length === 0
+            ? `linear-gradient(135deg, ${BLUE} 0%, ${BLUE_DARK} 100%)`
+            : (canSettle ? `linear-gradient(135deg, ${SUCCESS} 0%, #1E8E47 100%)` : GRAY200),
+          color: (candidates.length === 0 || canSettle) ? WHITE : GRAY400,
+          border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700,
+          fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
+          cursor: (candidates.length === 0 || canSettle) ? "pointer" : "not-allowed",
+          boxShadow: canSettle ? `0 10px 24px ${SUCCESS}40` : "none", transition: "all 0.2s",
+        }}>
+          {candidates.length === 0 ? "Done" : "Record Settlement"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const NotificationsScreen = () => (
+  <div style={{ flex: 1, overflow: "auto", background: GHOST }}>
+    <div style={{ background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_MID} 100%)`, padding: "20px 24px 24px" }}>
+      <div style={{ color: WHITE, fontSize: 22, fontWeight: 800, fontFamily: "'Playfair Display', serif" }}>Activity</div>
+      <div style={{ color: `${WHITE}80`, fontSize: 12, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>Stay in the loop with what's happening</div>
+    </div>
+    <div style={{ padding: 20 }}>
+      {NOTIFICATIONS_DATA.map(n => (
+        <div key={n.id} style={{
+          background: WHITE, borderRadius: 14, padding: 14, marginBottom: 10,
+          display: "flex", alignItems: "flex-start", gap: 12, border: `1px solid ${GRAY100}`,
+          ...(n.read ? {} : { borderLeft: `3px solid ${CRIMSON}` }),
+        }}>
+          <div style={{ fontSize: 22 }}>{n.icon}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: GRAY800, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.4 }}>{n.text}</div>
+            <div style={{ fontSize: 11, color: GRAY400, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>{n.time}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const ProfileScreen = ({ onLogout }) => (
+  <div style={{ flex: 1, overflow: "auto", background: GHOST }}>
+    <div style={{
+      background: `linear-gradient(160deg, ${BLUE_DARK} 0%, ${CRIMSON_DARK} 100%)`,
+      padding: "32px 24px 36px", display: "flex", flexDirection: "column", alignItems: "center",
+    }}>
+      <Avatar user={ME} size={64} />
+      <div style={{ color: WHITE, fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display', serif", marginTop: 10 }}>{ME.name}</div>
+      <div style={{ color: `${WHITE}70`, fontSize: 12, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>asim@cybersquadnp.com</div>
+    </div>
+    <div style={{ padding: "18px 20px" }}>
+      {[
+        { icon: "👤", label: "Edit Profile" },
+        { icon: "🔔", label: "Notification Preferences" },
+        { icon: "💱", label: "Default Currency" },
+        { icon: "🌙", label: "Appearance" },
+        { icon: "🔒", label: "Security & Privacy" },
+        { icon: "📊", label: "Analytics" },
+        { icon: "📤", label: "Export Data" },
+        { icon: "❓", label: "Help & Support" },
+        { icon: "ℹ️", label: "About VaagBanda" },
+      ].map((item, i) => (
+        <div key={i} style={{
+          display: "flex", alignItems: "center", gap: 14, padding: "13px 4px",
+          borderBottom: `1px solid ${GRAY100}`, cursor: "pointer",
+        }}>
+          <span style={{ fontSize: 18 }}>{item.icon}</span>
+          <span style={{ fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: GRAY800, fontWeight: 500 }}>{item.label}</span>
+          <span style={{ marginLeft: "auto", color: GRAY400, fontSize: 18 }}>›</span>
+        </div>
+      ))}
+      <div onClick={onLogout} style={{
+        display: "flex", alignItems: "center", gap: 14, padding: "14px 4px", cursor: "pointer", marginTop: 8,
+      }}>
+        <span style={{ fontSize: 18 }}>🚪</span>
+        <span style={{ fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: CRIMSON, fontWeight: 600 }}>Log Out</span>
+      </div>
+      <div style={{ textAlign: "center", marginTop: 24, color: GRAY400, fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
+        VaagBanda v1.0 · CyberSquadNp
+        <br/>Dongshin University
+      </div>
+    </div>
+  </div>
+);
+
+/* ─── MAIN APP ─── */
+function VaagBandaApp() {
+  const [authStage, setAuthStage] = useState("splash");
+  const [screen, setScreen] = useState("home");
+  const [activeTab, setActiveTab] = useState("home");
+  const [groups, setGroups] = useState(INITIAL_GROUPS);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [scanPrefill, setScanPrefill] = useState(null);
+  const [expensePrefill, setExpensePrefill] = useState(null);
+
+  const navigate = (tab) => {
+    setActiveTab(tab);
+    setScreen(tab);
+    setSelectedGroup(null);
+  };
+
+  const openGroup = (gid) => {
+    setSelectedGroup(gid);
+    setScreen("groupDetail");
+  };
+
+  const openAddExpense = () => {
+    setScanPrefill(null);
+    setScreen("addExpense");
+  };
+
+  const openScan = () => setScreen("scan");
+  const openCreateGroup = () => setScreen("createGroup");
+  const openSettle = () => { setExpensePrefill(null); setScreen("settle"); };
+  const openSettleForExpense = (expense) => { setExpensePrefill(expense); setScreen("settle"); };
+
+  const handleScanComplete = (prefill) => {
+    setScanPrefill(prefill);
+    setScreen("addExpense");
+  };
+
+  const handleSaveExpense = (groupId, expense) => {
+    setGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, expenses: [expense, ...g.expenses] } : g
+    ));
+  };
+
+  const handleCreateGroup = (newGroup) => {
+    setGroups(prev => [...prev, newGroup]);
+  };
+
+  const handleSettle = (groupId, settlement) => {
+    setGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, settlements: [...g.settlements, settlement] } : g
+    ));
+  };
+
+  const closeOverlay = () => {
+    setScanPrefill(null);
+    setExpensePrefill(null);
+    if (selectedGroup) setScreen("groupDetail");
+    else setScreen(activeTab);
+  };
+
+  const currentGroup = groups.find(g => g.id === selectedGroup);
+  const showTabBar = authStage === "app" && !["addExpense", "scan", "createGroup", "settle"].includes(screen);
+
+  return (
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: `linear-gradient(160deg, ${BLUE_DARK} 0%, ${BLUE} 40%, ${CRIMSON_DARK} 100%)`,
+      fontFamily: "'DM Sans', sans-serif", padding: "20px",
+    }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+      <style>{`
+        * { -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { width: 0; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        input::placeholder { color: ${GRAY400}; }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      `}</style>
+
+      <div style={{ position: "fixed", top: 30, left: 0, right: 0, textAlign: "center", zIndex: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: `${WHITE}40`, letterSpacing: 4, textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif" }}>VaagBanda</div>
+        <div style={{ fontSize: 11, color: `${WHITE}25`, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>Working Mockup · CyberSquadNp</div>
+      </div>
+
+      <PhoneFrame>
+        {authStage === "splash" && <SplashScreen onDone={() => setAuthStage("login")} />}
+        {authStage === "login" && (
+          <LoginScreen onLogin={() => setAuthStage("app")} onGoToSignup={() => setAuthStage("signup")} />
+        )}
+        {authStage === "signup" && (
+          <SignUpScreen onSignup={() => setAuthStage("app")} onGoToLogin={() => setAuthStage("login")} />
+        )}
+
+        {authStage === "app" && (
+          <>
+            {screen === "home" && (
+              <HomeScreen groups={groups} onGroupTap={openGroup}
+                onQuickAdd={openAddExpense} onQuickScan={openScan}
+                onNewGroup={openCreateGroup} />
+            )}
+            {screen === "groups" && (
+              <HomeScreen groups={groups} onGroupTap={openGroup}
+                onQuickAdd={openAddExpense} onQuickScan={openScan}
+                onNewGroup={openCreateGroup} />
+            )}
+            {screen === "groupDetail" && currentGroup && (
+              <GroupDetailScreen
+                group={currentGroup}
+                onBack={() => { setScreen(activeTab); setSelectedGroup(null); }}
+                onAddExpense={openAddExpense}
+                onSettle={openSettle}
+                onSettleExpense={openSettleForExpense}
+              />
+            )}
+            {screen === "addExpense" && (
+              <AddExpenseScreen
+                groups={groups}
+                defaultGroupId={selectedGroup || groups[0]?.id}
+                prefill={scanPrefill}
+                onClose={closeOverlay}
+                onSave={handleSaveExpense}
+                onOpenScan={openScan}
+              />
+            )}
+            {screen === "scan" && (
+              <ScanReceiptScreen
+                onClose={closeOverlay}
+                onScanComplete={handleScanComplete}
+              />
+            )}
+            {screen === "createGroup" && (
+              <CreateGroupScreen
+                onClose={closeOverlay}
+                onCreate={handleCreateGroup}
+              />
+            )}
+            {screen === "settle" && currentGroup && (
+              <SettleUpScreen
+                group={currentGroup}
+                expensePrefill={expensePrefill}
+                onClose={closeOverlay}
+                onSettle={handleSettle}
+              />
+            )}
+            {screen === "notifications" && <NotificationsScreen />}
+            {screen === "profile" && <ProfileScreen onLogout={() => setAuthStage("login")} />}
+            {showTabBar && (
+              <TabBar
+                active={screen === "groupDetail" ? "groups" : activeTab}
+                onNavigate={navigate}
+                onAddPress={openAddExpense}
+              />
+            )}
+          </>
+        )}
+      </PhoneFrame>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<VaagBandaApp />);
+
+requestAnimationFrame(() => {
+  const el = document.getElementById("loading");
+  if (el) { el.classList.add("hide"); setTimeout(() => el.remove(), 500); }
+});
+</script>
+</body>
+</html>
