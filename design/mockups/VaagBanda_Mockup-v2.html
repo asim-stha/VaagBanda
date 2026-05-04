@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VaagBanda — Working Mockup v4</title>
+<title>VaagBanda — Working Mockup v3</title>
 <style>
   html, body {
     margin: 0; padding: 0;
@@ -69,9 +69,9 @@ const WARN = "#F39C12";
 /* ─── Mock Data ─── */
 const USERS = [
   { id: "u1", name: "Asim", avatar: "A", color: CRIMSON },
-  { id: "u2", name: "Riya", avatar: "R", color: "#E67E22" },
-  { id: "u3", name: "Kamal", avatar: "K", color: BLUE_MID },
-  { id: "u4", name: "Sita", avatar: "S", color: "#27AE60" },
+  { id: "u2", name: "Jabin", avatar: "J", color: "#E67E22" },
+  { id: "u3", name: "Nischal", avatar: "N", color: BLUE_MID },
+  { id: "u4", name: "Rojan", avatar: "R", color: "#27AE60" },
 ];
 const ME = USERS[0];
 
@@ -103,10 +103,10 @@ const CATEGORIES = {
 };
 
 const NOTIFICATIONS_DATA = [
-  { id: "n1", text: "Riya added \"Dinner at Lakeside\" — NPR 4,800", time: "2 days ago", read: true, icon: "🍽️" },
-  { id: "n2", text: "Riya settled NPR 5,000 with you (cash)", time: "1 day ago", read: true, icon: "✅" },
-  { id: "n3", text: "Sita added \"Pizza order\" — NPR 2,400", time: "5 hours ago", read: false, icon: "🍕" },
-  { id: "n4", text: "Kamal sent you a payment reminder", time: "2 hours ago", read: false, icon: "🔔" },
+  { id: "n1", text: "Nischal added \"Dinner at Lakeside\" — NPR 4,800", time: "2 days ago", read: true, icon: "🍽️" },
+  { id: "n2", text: "Nischal settled NPR 5,000 with you (cash)", time: "1 day ago", read: true, icon: "✅" },
+  { id: "n3", text: "Rojan added \"Pizza order\" — NPR 2,400", time: "5 hours ago", read: false, icon: "🍕" },
+  { id: "n4", text: "Jabin sent you a payment reminder", time: "2 hours ago", read: false, icon: "🔔" },
 ];
 
 /* ─── Utilities ─── */
@@ -307,7 +307,7 @@ const socialLabelStyle = { fontSize: 13, fontWeight: 600, color: GRAY800, fontFa
 
 /* ─── LOGIN ─── */
 const LoginScreen = ({ onLogin, onGoToSignup }) => {
-  const [email, setEmail] = useState("asim@cybersquadnp.com");
+  const [email, setEmail] = useState("VaagBanda@cybersquadnp.com");
   const [password, setPassword] = useState("••••••••");
   const [showPwd, setShowPwd] = useState(false);
   const [emailFocus, setEmailFocus] = useState(false);
@@ -471,7 +471,7 @@ const SignUpScreen = ({ onSignup, onGoToLogin }) => {
         background: WHITE, marginTop: -28, borderRadius: "28px 28px 0 0",
         padding: "24px 24px 20px", flex: 1, boxShadow: `0 -8px 30px rgba(15,38,64,0.06)`, position: "relative", zIndex: 2,
       }}>
-        <SignupField icon="user" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Asim Maharjan" label="Display Name" fieldKey="name" />
+        <SignupField icon="user" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nischal Cutiee" label="Display Name" fieldKey="name" />
         <SignupField icon="mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" label="Email Address" fieldKey="email" />
         <SignupField icon="lock" type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" label="Password" fieldKey="password"
           suffix={<div onClick={() => setShowPwd(!showPwd)} style={{ cursor: "pointer", display: "flex", alignItems: "center" }}><Icon name={showPwd ? "eyeOff" : "eye"} size={18} color={GRAY400}/></div>}/>
