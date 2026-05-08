@@ -1,3 +1,50 @@
-FILE LINK
-[Open VaagBanda_Physical_Design_Specification_V1](https://view.officeapps.live.com/op/view.aspx?src=raw.githubusercontent.com/asim-stha/VaagBanda/main/design/DESIGN%20DOCUMENTS/VaagBanda_Physical_Design_Specification_V1.docx)
+# Design Documents
 
+Welcome to the VaagBanda design documentation repository. This directory contains comprehensive design specifications and architectural documentation for the VaagBanda Software Engineering project.
+
+## Overview
+
+VaagBanda is a web-based application built with HTML, JavaScript, and CSS. This folder contains all design documents that outline the system architecture, database design, UI/UX specifications, and technical requirements.
+
+## Documentation Index
+
+### Physical Design Specification
+- **[VaagBanda Physical Design Specification V1](https://view.officeapps.live.com/op/view.aspx?src=raw.githubusercontent.com/asim-stha/VaagBanda/main/design/DESIGN%20DOCUMENTS/VaagBanda_Physical_Design_Specification_V1.xlsx)** - Latest design specification document
+  - Database schema and design
+  - Physical data model
+  - Technical architecture details
+                                        
+## Project Stack
+
+This project is composed of:
+- **HTML**: 78.5% - Frontend markup
+- **JavaScript**: 10.8% - Client-side logic
+- **CSS**: 10.7% - Styling and layout
+
+## How to Use These Documents
+
+1. **For New Team Members**: Start with the Physical Design Specification to understand the system architecture
+2. **For Developers**: Reference these documents when implementing features to ensure consistency with the design
+3. **For Design Review**: Use these documents as the source of truth for design decisions and specifications
+
+## Document Status
+
+| Document | Version | Last Updated | Status |
+|----------|---------|--------------|--------|
+| Physical Design Specification | V1 | - | Current |
+
+## Contributing
+
+When making updates to the design:
+1. Keep documentation in sync with implementation changes
+2. Update version numbers when significant changes are made
+3. Document the rationale behind architectural decisions
+4. Include diagrams and visual aids where helpful
+
+## Questions or Issues?
+
+If you have questions about the design or find outdated information, please open an issue in the repository.
+
+---
+
+**Last Updated**: 2026-05-08
