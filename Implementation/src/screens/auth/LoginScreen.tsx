@@ -1,17 +1,3 @@
-/**
- * VaagBanda — LoginScreen.tsx
- * React Native implementation of the login interface
- *
- * Project: VaagBanda · Smart Mobile Expense-Splitting App
- * Team: CyberSquadNp · Dongshin University
- *
- * ─── Required dependencies (install via Expo or npm) ───
- *   npx expo install expo-linear-gradient react-native-svg
- *   npx expo install @expo-google-fonts/dm-sans @expo-google-fonts/playfair-display expo-font
- *
- * Maps to SRS §4.1 (User Registration & Authentication)
- * Maps to AuthDB tables: Users, Sessions, BiometricAuth, PasswordReset
- */
 
 import React, { useState } from 'react';
 import {
