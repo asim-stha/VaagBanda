@@ -8,6 +8,9 @@ type Screen = 'login' | 'signup' | 'forgot';
 export default function App() {
   const [screen, setScreen] = useState<Screen>('login');
 
+export default function App() {
+  const [screen, setScreen] = useState<'login' | 'signup'>('login');
+
   if (screen === 'signup') {
     return (
       <SignupScreen
@@ -38,6 +41,7 @@ export default function App() {
       onLogin={() => alert('Logged in! (demo)')}
       onGoToSignup={() => setScreen('signup')}
       onForgotPassword={() => setScreen('forgot')}
+      onForgotPassword={() => alert('Forgot pw screen coming next')}
     />
   );
 }
