@@ -52,6 +52,18 @@ nav {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-logo-img {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(220,20,60,0.35);
+  flex-shrink: 0;
 }
 
 .nav-links { display: flex; gap: 32px; list-style: none; }
@@ -519,6 +531,14 @@ footer {
   background: linear-gradient(135deg, var(--crimson), var(--blue-light));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   letter-spacing: 3px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.footer-logo-img {
+  width: 30px; height: 30px;
+  object-fit: cover; border-radius: 6px;
+  border: 1px solid rgba(220,20,60,0.3);
+  flex-shrink: 0;
 }
 
 .footer-note { font-size: 0.76rem; color: var(--muted); }
