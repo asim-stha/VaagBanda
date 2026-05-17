@@ -453,6 +453,62 @@ nav {
 }
 
 /* ══════════════════════════════════════
+   CONTACT
+══════════════════════════════════════ */
+.contact-section {
+  padding: 100px 60px;
+  text-align: center;
+  background: linear-gradient(180deg, #0a1628 0%, var(--ink) 100%);
+}
+
+.contact-grid {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-top: 56px;
+  flex-wrap: wrap;
+}
+
+.contact-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(220,20,60,0.18);
+  border-radius: 16px;
+  padding: 44px 48px;
+  min-width: 260px;
+  max-width: 320px;
+  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+
+.contact-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(220,20,60,0.45);
+  box-shadow: 0 16px 48px rgba(220,20,60,0.12);
+}
+
+.contact-icon {
+  font-size: 2.2rem;
+  margin-bottom: 16px;
+}
+
+.contact-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 3px;
+  color: var(--crimson-light);
+  margin-bottom: 12px;
+}
+
+.contact-value {
+  font-size: 0.92rem;
+  color: var(--white);
+  line-height: 1.7;
+  text-decoration: none;
+  display: block;
+}
+
+a.contact-value:hover { color: var(--crimson-light); }
+
+/* ══════════════════════════════════════
    FOOTER
 ══════════════════════════════════════ */
 footer {
@@ -505,7 +561,8 @@ footer {
   .features,
   .how,
   .team,
-  .cta-section                     { padding: 60px 24px; }
+  .cta-section,
+  .contact-section                 { padding: 60px 24px; }
   .features-grid                   { grid-template-columns: 1fr; }
   .steps                           { grid-template-columns: repeat(2,1fr); gap: 40px; }
   .steps::before                   { display: none; }
