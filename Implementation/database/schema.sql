@@ -63,3 +63,17 @@ ON expenses(group_id);
 
 CREATE INDEX idx_expenses_paid_by
 ON expenses(paid_by);
+
+CREATE TABLE expense_splits (
+    split_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    expense_id UUID NOT NULL REFERENCES expenses(expense_id) ON DELETE CASCADE,
+
+    user_id UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+
+    amount_owed NUMERIC(10, 2) NOT NULL CHECK (amount_owed >= 0),
+
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    UNIQUE(expense_id, user_id)
+);
