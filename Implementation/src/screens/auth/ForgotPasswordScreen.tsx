@@ -1,11 +1,12 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
@@ -56,6 +57,7 @@ const Icon = ({
     strokeWidth: 2,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
+    pointerEvents: 'none' as const,
   };
 
   switch (name) {
@@ -120,6 +122,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
   const canSubmit = isValidEmail(email) && !submitting;
 
@@ -213,27 +216,31 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
                 </View>
 
                 <Text style={styles.label}>Email Address</Text>
-                <View style={[styles.field, focused && styles.fieldFocused]}>
-                  <Icon
-                    name="mail"
-                    size={18}
-                    color={focused ? COLORS.CRIMSON : COLORS.GRAY400}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="you@example.com"
-                    placeholderTextColor={COLORS.GRAY400}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
-                    onSubmitEditing={handleSubmit}
-                    returnKeyType="send"
-                  />
-                </View>
+                <TouchableWithoutFeedback onPress={() => inputRef.current?.focus()}>
+                  <View style={[styles.field, focused && styles.fieldFocused]}>
+                    <Icon
+                      name="mail"
+                      size={18}
+                      color={focused ? COLORS.CRIMSON : COLORS.GRAY400}
+                    />
+                    <TextInput
+                      ref={inputRef}
+                      style={styles.input}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="you@example.com"
+                      placeholderTextColor={COLORS.GRAY400}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      editable={true}
+                      onFocus={() => setFocused(true)}
+                      onBlur={() => setFocused(false)}
+                      onSubmitEditing={handleSubmit}
+                      returnKeyType="send"
+                    />
+                  </View>
+                </TouchableWithoutFeedback>
 
                 {/* Validation hint */}
                 {email.length > 0 && !isValidEmail(email) && (
@@ -429,13 +436,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 24,
-    flex: 1,
+    flexGrow: 1,
     shadowColor: '#0F2640',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.06,
     shadowRadius: 30,
     elevation: 6,
-    zIndex: 2,
   },
 
   /* INFO CARD (form state) */
@@ -499,6 +505,7 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY800,
     fontWeight: '500',
     padding: 0,
+    minHeight: 20,
   },
   hintError: {
     fontSize: 11,

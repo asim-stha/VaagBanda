@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -8,7 +7,6 @@ import {
   Image,
   Animated,
   Easing,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -22,13 +20,9 @@ const COLORS = {
   WHITE: '#FFFFFF',
 };
 
-const { width: SCREEN_W } = Dimensions.get('window');
-
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface SplashScreenProps {
-  
   onDone?: () => void;
- 
   duration?: number;
 }
 
@@ -38,24 +32,28 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
   duration = 2200,
 }) => {
   // Animated values
-  const logoScale   = useRef(new Animated.Value(0.6)).current;
+  const logoScale = useRef(new Animated.Value(0.6)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleY      = useRef(new Animated.Value(12)).current;
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const taglineY    = useRef(new Animated.Value(12)).current;
-  const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const progress    = useRef(new Animated.Value(0)).current;
 
+  const titleY = useRef(new Animated.Value(12)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+
+  const taglineY = useRef(new Animated.Value(12)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+
+  const progress = useRef(new Animated.Value(0)).current;
+
+  /* ─── RUN ONCE ───────────────────────────────────────────── */
   useEffect(() => {
-    // Staggered entrance animations
     Animated.parallel([
-      // Logo: spring-in with overshoot
+      // Logo animation
       Animated.parallel([
         Animated.timing(logoOpacity, {
           toValue: 1,
           duration: 800,
           useNativeDriver: true,
         }),
+
         Animated.spring(logoScale, {
           toValue: 1,
           friction: 5,
@@ -63,15 +61,18 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           useNativeDriver: true,
         }),
       ]),
-      // Title: fade up at 300ms
+
+      // Title animation
       Animated.sequence([
         Animated.delay(300),
+
         Animated.parallel([
           Animated.timing(titleOpacity, {
             toValue: 1,
             duration: 700,
             useNativeDriver: true,
           }),
+
           Animated.timing(titleY, {
             toValue: 0,
             duration: 700,
@@ -80,15 +81,18 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           }),
         ]),
       ]),
-      // Tagline: fade up at 500ms
+
+      // Tagline animation
       Animated.sequence([
         Animated.delay(500),
+
         Animated.parallel([
           Animated.timing(taglineOpacity, {
             toValue: 1,
             duration: 700,
             useNativeDriver: true,
           }),
+
           Animated.timing(taglineY, {
             toValue: 0,
             duration: 700,
@@ -97,24 +101,25 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           }),
         ]),
       ]),
-      // Loading bar: fill from 0 → 1 over full splash duration
+
+      // Progress animation
       Animated.timing(progress, {
         toValue: 1,
-        duration: duration,
+        duration,
         easing: Easing.inOut(Easing.ease),
-        useNativeDriver: false, // width animation cannot use native driver
+        useNativeDriver: false,
       }),
     ]).start();
 
-    // Schedule navigation away
+    // Navigate after splash duration
     const timer = setTimeout(() => {
       onDone?.();
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration, onDone, logoOpacity, logoScale, titleOpacity, titleY, taglineOpacity, taglineY, progress]);
+  }, []);
 
-  // Interpolate progress bar width
+  // Progress width animation
   const progressWidth = progress.interpolate({
     inputRange: [0, 1],
     outputRange: ['0%', '100%'],
@@ -122,7 +127,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.BLUE_DARK}
+      />
+
       <LinearGradient
         colors={[COLORS.BLUE_DARK, COLORS.BLUE, COLORS.CRIMSON_DARK]}
         start={{ x: 0, y: 0 }}
@@ -136,7 +145,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
       {/* Main content */}
       <View style={styles.content}>
-        {/* Logo (white pill card) */}
+        {/* Logo */}
         <Animated.View
           style={[
             styles.logoPill,
@@ -180,14 +189,14 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
         </Animated.Text>
       </View>
 
-      {/* Loading progress bar */}
+      {/* Progress bar */}
       <View style={styles.progressTrack}>
         <Animated.View
           style={[styles.progressFill, { width: progressWidth }]}
         />
       </View>
 
-      {/* Footer credit */}
+      {/* Footer */}
       <Text style={styles.footer}>BY CYBERSQUADNP</Text>
     </View>
   );
@@ -203,11 +212,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  /* DECORATIVE BLOBS */
   blob: {
     position: 'absolute',
     borderRadius: 9999,
   },
+
   blob1: {
     top: -60,
     right: -60,
@@ -215,6 +224,7 @@ const styles = StyleSheet.create({
     height: 200,
     backgroundColor: 'rgba(220,20,60,0.25)',
   },
+
   blob2: {
     bottom: -80,
     left: -80,
@@ -223,33 +233,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  /* CONTENT */
   content: {
     alignItems: 'center',
     zIndex: 2,
   },
+
   logoPill: {
     backgroundColor: COLORS.WHITE,
     padding: 22,
     borderRadius: 28,
+
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 25 },
     shadowOpacity: 0.3,
     shadowRadius: 35,
+
     elevation: 20,
   },
+
   logoImage: {
     width: 140,
-    height: 162, // matches logo aspect ratio (taller than wide)
+    height: 162,
   },
+
   wordmark: {
     marginTop: 28,
     color: COLORS.WHITE,
     fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1,
-    // fontFamily: 'PlayfairDisplay_800ExtraBold', // uncomment after loading fonts
   },
+
   tagline: {
     marginTop: 8,
     color: 'rgba(255,255,255,0.85)',
@@ -259,7 +273,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  /* PROGRESS BAR */
   progressTrack: {
     position: 'absolute',
     bottom: 80,
@@ -270,13 +283,13 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     overflow: 'hidden',
   },
+
   progressFill: {
     height: '100%',
     backgroundColor: COLORS.WHITE,
     borderRadius: 2,
   },
 
-  /* FOOTER */
   footer: {
     position: 'absolute',
     bottom: 32,

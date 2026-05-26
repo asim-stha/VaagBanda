@@ -8,7 +8,7 @@ import HomeScreen from './src/screens/home/HomeScreen';
 import GroupDetailScreen from './src/screens/groups/GroupDetailScreen';
 import CreateGroupScreen from './src/screens/groups/CreateGroupScreen';
 import AddExpenseScreen from './src/screens/expenses/AddExpenseScreen';
-import SettleUpScreen from './src/screens/groups/SettleUpScreen';
+import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
  
 /* ─── ROUTE TYPES ──────────────────────────────────────────── */
 type Screen =

@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
@@ -53,6 +54,7 @@ const Icon = ({
     strokeWidth: 2,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
+    pointerEvents: 'none' as const,
   };
 
   switch (name) {
@@ -141,24 +143,29 @@ const InputField: React.FC<InputFieldProps> = ({
   keyboardType = 'default', autoCapitalize = 'none', rightSlot,
 }) => {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   return (
-    <View style={[styles.field, focused && styles.fieldFocused]}>
-      <Icon name={icon} size={18} color={focused ? COLORS.CRIMSON : COLORS.GRAY400} />
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.GRAY400}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-      />
-      {rightSlot}
-    </View>
+    <TouchableWithoutFeedback onPress={() => inputRef.current?.focus()}>
+      <View style={[styles.field, focused && styles.fieldFocused]}>
+        <Icon name={icon} size={18} color={focused ? COLORS.CRIMSON : COLORS.GRAY400} />
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.GRAY400}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
+          editable={true}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+        {rightSlot}
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -345,13 +352,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 24,
-    flex: 1,
+    flexGrow: 1,
     shadowColor: '#0F2640',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.06,
     shadowRadius: 30,
     elevation: 6,
-    zIndex: 2,
   },
 
   label: {
@@ -394,6 +400,7 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY800,
     fontWeight: '500',
     padding: 0,
+    minHeight: 20,
   },
 
   btnPrimary: {
