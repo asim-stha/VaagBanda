@@ -1,47 +1,54 @@
 import React, { useState } from 'react';
+import SplashScreen from './src/screens/auth/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import HomeScreen from './src/screens/home/HomeScreen';
 
-type Screen = 'login' | 'signup' | 'forgot';
+type Screen = 'splash' | 'login' | 'signup' | 'forgot' | 'home';
+type Tab = 'home' | 'groups' | 'activity' | 'profile';
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('login');
+  const [screen, setScreen] = useState<Screen>('splash');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
 
-export default function App() {
-  const [screen, setScreen] = useState<'login' | 'signup'>('login');
-
+  if (screen === 'splash') {
+    return <SplashScreen onDone={() => setScreen('login')} />;
+  }
   if (screen === 'signup') {
     return (
       <SignupScreen
         onGoToLogin={() => setScreen('login')}
-        onSignup={(data) => {
-          console.log('Signup:', data);
-          alert('Account created! (demo)');
-        }}
+        onSignup={() => setScreen('home')}
       />
     );
   }
-
   if (screen === 'forgot') {
     return (
       <ForgotPasswordScreen
         onGoToLogin={() => setScreen('login')}
-        onSubmit={async (email) => {
-          console.log('Reset requested for:', email);
-          // Simulate API delay
-          await new Promise(r => setTimeout(r, 800));
-        }}
+        onSubmit={async () => { await new Promise(r => setTimeout(r, 800)); }}
       />
     );
   }
-
+  if (screen === 'home') {
+    return (
+      <HomeScreen
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onGroupTap={(id) => console.log('open group', id)}
+        onAddExpense={() => console.log('add expense')}
+        onScanReceipt={() => console.log('scan')}
+        onCreateGroup={() => console.log('create group')}
+        onOpenNotifications={() => setActiveTab('activity')}
+      />
+    );
+  }
   return (
     <LoginScreen
-      onLogin={() => alert('Logged in! (demo)')}
+      onLogin={() => setScreen('home')}
       onGoToSignup={() => setScreen('signup')}
       onForgotPassword={() => setScreen('forgot')}
-      onForgotPassword={() => alert('Forgot pw screen coming next')}
     />
   );
 }
