@@ -12,9 +12,12 @@ import {
   StatusBar,
   SafeAreaView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Circle, Line, Polyline } from 'react-native-svg';
+import { authService } from '../../services/authService';
+
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
 const COLORS = {
@@ -170,6 +173,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await authService.signIn(email.trim(), password);
+      onLogin?.();
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -246,14 +268,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               }
             />
 
-            <TouchableOpacity activeOpacity={0.85} onPress={onLogin} style={{ marginTop: 20 }}>
+            {error && (
+              <Text style={{ color: COLORS.CRIMSON, fontSize: 13, marginTop: 12, fontWeight: '600', textAlign: 'center' }}>
+                {error}
+              </Text>
+            )}
+
+            <TouchableOpacity activeOpacity={0.85} onPress={handleLogin} disabled={loading} style={{ marginTop: 20 }}>
               <LinearGradient
                 colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.btnPrimary}
               >
-                <Text style={styles.btnPrimaryText}>Sign In</Text>
+                {loading ? (
+                  <ActivityIndicator color={COLORS.WHITE} size="small" />
+                ) : (
+                  <Text style={styles.btnPrimaryText}>Sign In</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 

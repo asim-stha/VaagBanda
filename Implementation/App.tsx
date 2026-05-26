@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { authService } from './src/services/authService';
  
 import SplashScreen from './src/screens/auth/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -8,7 +10,7 @@ import HomeScreen from './src/screens/home/HomeScreen';
 import GroupDetailScreen from './src/screens/groups/GroupDetailScreen';
 import CreateGroupScreen from './src/screens/groups/CreateGroupScreen';
 import AddExpenseScreen from './src/screens/expenses/AddExpenseScreen';
-import SettleUpScreen from './src/screens/groups/SettleUpScreen';
+import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
  
 /* ─── ROUTE TYPES ──────────────────────────────────────────── */
 type Screen =
@@ -23,124 +25,157 @@ type Screen =
  | 'settle-up';
  
 type Tab = 'home' | 'groups' | 'activity' | 'profile';
- 
-/* ─── MAIN APP ─────────────────────────────────────────────── */
+
+/* ─── MAIN APP ENTRY ───────────────────────────────────────── */
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+ 
+/* ─── MAIN APP CONTENT ─────────────────────────────────────── */
+function AppContent() {
+ const { user, loading, signOut } = useAuth();
  const [screen, setScreen] = useState<Screen>('splash');
  const [activeTab, setActiveTab] = useState<Tab>('home');
  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+
+ // Sync screens with authentication state once initial loading completes
+ useEffect(() => {
+   if (loading) return;
+   
+   if (user) {
+     // If authenticated and on an auth screen, navigate to home
+     if (['splash', 'login', 'signup', 'forgot'].includes(screen)) {
+       setScreen('home');
+     }
+   } else {
+     // If unauthenticated and on a private screen, navigate to login
+     if (!['splash', 'login', 'signup', 'forgot'].includes(screen)) {
+       setScreen('login');
+     }
+   }
+ }, [user, loading]);
  
  /* ─── 1. SPLASH ─── */
  if (screen === 'splash') {
- return React.createElement(SplashScreen, { onDone: () => setScreen('login') });
+   return React.createElement(SplashScreen, { 
+     onDone: () => {
+       if (user) {
+         setScreen('home');
+       } else {
+         setScreen('login');
+       }
+     } 
+   });
  }
  
  /* ─── 2. SIGNUP ─── */
  if (screen === 'signup') {
- return React.createElement(SignupScreen, {
- onGoToLogin: () => setScreen('login'),
- onSignup: (data: any) => {
- console.log('Signup data:', data);
- setScreen('home');
- },
- onGoogleSignup: () => console.log('google signup'),
- onAppleSignup: () => console.log('apple signup'),
- onOpenTerms: () => console.log('open terms'),
- onOpenPrivacy: () => console.log('open privacy'),
- });
+   return React.createElement(SignupScreen, {
+     onGoToLogin: () => setScreen('login'),
+     onSignup: async (data: any) => {
+       await authService.signUp(data.email, data.password, data.name);
+     },
+     onGoogleSignup: () => console.log('google signup'),
+     onAppleSignup: () => console.log('apple signup'),
+     onOpenTerms: () => console.log('open terms'),
+     onOpenPrivacy: () => console.log('open privacy'),
+   });
  }
  
  /* ─── 3. FORGOT PASSWORD ─── */
  if (screen === 'forgot') {
- return React.createElement(ForgotPasswordScreen, {
- onGoToLogin: () => setScreen('login'),
- onSubmit: async (email: string) => {
- console.log('Password reset requested for:', email);
- await new Promise((r) => setTimeout(r, 800));
- },
- });
+   return React.createElement(ForgotPasswordScreen, {
+     onGoToLogin: () => setScreen('login'),
+     onSubmit: async (email: string) => {
+       await authService.resetPassword(email);
+     },
+   });
  }
  
  /* ─── 4. ADD EXPENSE ─── */
  if (screen === 'add-expense') {
- return React.createElement(AddExpenseScreen, {
- groupName: 'Pokhara Trip',
- groupCurrency: 'NPR',
- onBack: () => setScreen('group'),
- onSave: (expense: any) => {
- console.log('New expense saved:', expense);
- setScreen('group');
- },
- });
+   return React.createElement(AddExpenseScreen, {
+     groupName: 'Pokhara Trip',
+     groupCurrency: 'NPR',
+     onBack: () => setScreen('group'),
+     onSave: (expense: any) => {
+       console.log('New expense saved:', expense);
+       setScreen('group');
+     },
+   });
  }
  
  /* ─── 5. SETTLE UP ─── */
  if (screen === 'settle-up') {
- return React.createElement(SettleUpScreen, {
- groupName: 'Pokhara Trip',
- groupCurrency: 'NPR',
- onBack: () => setScreen('group'),
- onSettle: (settlement: any) => {
- console.log('Settlement recorded:', settlement);
- },
- });
+   return React.createElement(SettleUpScreen, {
+     groupName: 'Pokhara Trip',
+     groupCurrency: 'NPR',
+     onBack: () => setScreen('group'),
+     onSettle: (settlement: any) => {
+       console.log('Settlement recorded:', settlement);
+     },
+   });
  }
  
  /* ─── 6. CREATE GROUP ─── */
  if (screen === 'create-group') {
- return React.createElement(CreateGroupScreen, {
- onBack: () => setScreen('home'),
- onCreate: (group: any) => {
- console.log('Group created:', group);
- setScreen('home');
- },
- });
+   return React.createElement(CreateGroupScreen, {
+     onBack: () => setScreen('home'),
+     onCreate: (group: any) => {
+       console.log('Group created:', group);
+       setScreen('home');
+     },
+   });
  }
  
  /* ─── 7. GROUP DETAIL ─── */
  if (screen === 'group') {
- return React.createElement(GroupDetailScreen, {
- onBack: () => setScreen('home'),
- onAddExpense: () => setScreen('add-expense'),
- onSettleUp: () => setScreen('settle-up'),
- onExpenseTap: (expenseId: string) => {
- console.log('open expense detail', expenseId);
- },
- onOpenSettings: () => {
- console.log('open group settings');
- },
- });
+   return React.createElement(GroupDetailScreen, {
+     onBack: () => setScreen('home'),
+     onAddExpense: () => setScreen('add-expense'),
+     onSettleUp: () => setScreen('settle-up'),
+     onExpenseTap: (expenseId: string) => {
+       console.log('open expense detail', expenseId);
+     },
+     onOpenSettings: () => {
+       console.log('open group settings');
+     },
+   });
  }
  
  /* ─── 8. HOME ─── */
  if (screen === 'home') {
- return React.createElement(HomeScreen, {
- activeTab: activeTab,
- onTabChange: setActiveTab,
- onGroupTap: (id: string) => {
- setActiveGroupId(id);
- setScreen('group');
- },
- onAddExpense: () => setScreen('add-expense'),
- onScanReceipt: () => console.log('scan receipt'),
- onCreateGroup: () => setScreen('create-group'),
- onOpenNotifications: () => setActiveTab('activity'),
- });
+   return React.createElement(HomeScreen, {
+     activeTab: activeTab,
+     onTabChange: setActiveTab,
+     onGroupTap: (id: string) => {
+       setActiveGroupId(id);
+       setScreen('group');
+     },
+     onAddExpense: () => setScreen('add-expense'),
+     onScanReceipt: () => console.log('scan receipt'),
+     onCreateGroup: () => setScreen('create-group'),
+     onOpenNotifications: () => setActiveTab('activity'),
+   });
  }
  
  /* ─── 9. LOGIN (default) ─── */
  return React.createElement(LoginScreen, {
- onLogin: () => {
- console.log('login pressed');
- setScreen('home');
- },
- onGoToSignup: () => setScreen('signup'),
- onForgotPassword: () => setScreen('forgot'),
- onBiometricLogin: () => {
- console.log('biometric login');
- setScreen('home');
- },
- onGoogleLogin: () => console.log('google login'),
- onAppleLogin: () => console.log('apple login'),
+   onLogin: () => {
+     // Local handleSignIn within LoginScreen will call authService
+     setScreen('home');
+   },
+   onGoToSignup: () => setScreen('signup'),
+   onForgotPassword: () => setScreen('forgot'),
+   onBiometricLogin: () => {
+     console.log('biometric login');
+     setScreen('home');
+   },
+   onGoogleLogin: () => console.log('google login'),
+   onAppleLogin: () => console.log('apple login'),
  });
-}
+}

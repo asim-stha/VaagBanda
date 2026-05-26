@@ -11,6 +11,7 @@ import {
   StatusBar,
   SafeAreaView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Circle, Line, Polyline } from 'react-native-svg';
@@ -205,13 +206,23 @@ const SignupScreen: React.FC<SignupScreenProps> = ({
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [agree, setAgree] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const strength = useMemo(() => calcStrength(password), [password]);
-  const canSubmit = agree && name.length > 0 && email.length > 0 && password.length >= 8;
+  const canSubmit = agree && name.length > 0 && email.length > 0 && password.length >= 8 && !submitting;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
-    onSignup?.({ name, email, password });
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSignup?.({ name, email: email.trim(), password });
+    } catch (err: any) {
+      setError(err.message || 'Signup failed.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -333,6 +344,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({
               </Text>
             </TouchableOpacity>
 
+            {error && (
+              <Text style={{ color: COLORS.WEAK, fontSize: 13, marginBottom: 12, fontWeight: '600', textAlign: 'center' }}>
+                {error}
+              </Text>
+            )}
+
             <TouchableOpacity activeOpacity={0.85} onPress={handleSubmit} disabled={!canSubmit}>
               {canSubmit ? (
                 <LinearGradient
@@ -341,11 +358,19 @@ const SignupScreen: React.FC<SignupScreenProps> = ({
                   end={{ x: 1, y: 1 }}
                   style={styles.btnPrimary}
                 >
-                  <Text style={styles.btnPrimaryText}>Create Account</Text>
+                  {submitting ? (
+                    <ActivityIndicator color={COLORS.WHITE} size="small" />
+                  ) : (
+                    <Text style={styles.btnPrimaryText}>Create Account</Text>
+                  )}
                 </LinearGradient>
               ) : (
                 <View style={[styles.btnPrimary, styles.btnDisabled]}>
-                  <Text style={styles.btnDisabledText}>Create Account</Text>
+                  {submitting ? (
+                    <ActivityIndicator color={COLORS.GRAY400} size="small" />
+                  ) : (
+                    <Text style={styles.btnDisabledText}>Create Account</Text>
+                  )}
                 </View>
               )}
             </TouchableOpacity>

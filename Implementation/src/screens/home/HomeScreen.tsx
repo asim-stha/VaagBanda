@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
+import { useAuth } from '../../context/AuthContext';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
 const COLORS = {
@@ -294,6 +295,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   activeTab = 'home',
   hasUnreadNotifications = true,
 }) => {
+  const { signOut, user: authUser } = useAuth();
+  
+  const displayUser = useMemo(() => {
+    return {
+      id: authUser?.id || user.id,
+      name: authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || user.name,
+      email: authUser?.email || '',
+      avatarColor: user.avatarColor,
+    };
+  }, [authUser, user]);
+
   // Compute overall balance (sum across all groups)
   // Note: in production, you'd convert each group to a common currency first.
   // For now this is a simple sum, assuming a single base currency.
@@ -309,16 +321,45 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return 'Good evening';
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+  const renderContent = () => {
+    if (activeTab === 'profile') {
+      return (
+        <View style={[styles.section, { marginTop: 24 }]}>
+          {/* Profile Details Card */}
+          <View style={styles.profileCard}>
+            <View style={styles.profileHeader}>
+              <Avatar user={displayUser} size={80} />
+              <Text style={styles.profileName}>{displayUser.name}</Text>
+              <Text style={styles.profileEmail}>{displayUser.email}</Text>
+            </View>
+            
+            <View style={styles.profileDivider} />
+            
+            <View style={styles.profileDetailsRow}>
+              <Text style={styles.profileDetailsLabel}>Account ID</Text>
+              <Text style={styles.profileDetailsValue} numberOfLines={1}>
+                {displayUser.id}
+              </Text>
+            </View>
+          </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
+          {/* Sign Out Action Button */}
+          <TouchableOpacity activeOpacity={0.85} onPress={signOut} style={{ marginTop: 24 }}>
+            <LinearGradient
+              colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signOutBtn}
+            >
+              <Text style={styles.signOutBtnText}>Sign Out</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <>
         {/* ─── HEADER ─── */}
         <LinearGradient
           colors={[COLORS.BLUE_DARK, COLORS.BLUE, COLORS.BLUE_MID]}
@@ -333,10 +374,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Top row: greeting + bell icon */}
           <View style={styles.topRow}>
             <View style={styles.greetingRow}>
-              <Avatar user={user} size={42} />
+              <Avatar user={displayUser} size={42} />
               <View style={{ marginLeft: 12 }}>
                 <Text style={styles.greetingLabel}>{getGreeting()}</Text>
-                <Text style={styles.greetingName}>{user.name}</Text>
+                <Text style={styles.greetingName}>{displayUser.name}</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -409,23 +450,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             ))
           )}
         </View>
+      </>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {renderContent()}
       </ScrollView>
 
       {/* ─── FLOATING ADD BUTTON ─── */}
-      <TouchableOpacity
-        onPress={onAddExpense}
-        activeOpacity={0.85}
-        style={styles.fab}
-      >
-        <LinearGradient
-          colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabInner}
+      {activeTab !== 'profile' && (
+        <TouchableOpacity
+          onPress={onAddExpense}
+          activeOpacity={0.85}
+          style={styles.fab}
         >
-          <Icon name="plus" size={26} color={COLORS.WHITE} />
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabInner}
+          >
+            <Icon name="plus" size={26} color={COLORS.WHITE} />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
       {/* ─── BOTTOM TAB BAR ─── */}
       <TabBar
@@ -773,6 +831,75 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10,
+    letterSpacing: 0.3,
+  },
+
+  /* PROFILE VIEW STYLES */
+  profileCard: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#0F2640',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.GRAY800,
+    marginTop: 12,
+    letterSpacing: -0.3,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: COLORS.GRAY600,
+    marginTop: 4,
+  },
+  profileDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: COLORS.GRAY100,
+    marginVertical: 16,
+  },
+  profileDetailsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  profileDetailsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.GRAY600,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  profileDetailsValue: {
+    fontSize: 12,
+    color: COLORS.GRAY400,
+    maxWidth: '60%',
+  },
+  signOutBtn: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: COLORS.CRIMSON,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  signOutBtnText: {
+    color: COLORS.WHITE,
+    fontSize: 15,
+    fontWeight: '700',
     letterSpacing: 0.3,
   },
 });
