@@ -1,20 +1,3 @@
-/**
- * VaagBanda — HomeScreen.tsx
- * React Native main hub after login — groups list, overall balance, quick actions
- *
- * Project: VaagBanda · Smart Mobile Expense-Splitting Application
- * Team: CyberSquadNp · Dongshin University
- *
- * Maps to:
- *   • SRS §3.1: tab-based navigation (Home, Groups, Activity, Profile)
- *   • SRS §4.4: overall balance summary across all groups
- *   • SRS §4.2: group management (create, list, navigate to detail)
- *   • AuthDB.Users, SharedExpenseDB.Groups, GroupMembers, Expenses, Splits, Settlements
- *
- * ─── Required dependencies ───
- *   npx expo install expo-linear-gradient react-native-svg
- */
-
 import React, { useMemo, useState } from 'react';
 import {
   View,

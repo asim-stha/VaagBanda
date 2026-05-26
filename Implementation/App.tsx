@@ -178,4 +178,4 @@ function AppContent() {
    onGoogleLogin: () => console.log('google login'),
    onAppleLogin: () => console.log('apple login'),
  });
-}
+}

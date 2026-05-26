@@ -1,22 +1,3 @@
-/**
- * VaagBanda — GroupDetailScreen.tsx
- * React Native screen showing a single group: expenses list, member balances,
- * and quick paths to Add Expense / Settle Up.
- *
- * Project: VaagBanda · Smart Mobile Expense-Splitting Application
- * Team: CyberSquadNp · Dongshin University
- *
- * Maps to:
- *   • SRS §4.4: "User opens a group → System displays a balance summary
- *     showing each member's net position."
- *   • SRS §4.3.2: tap "Add Expense" inside group context
- *   • SRS §4.5.2: tap "Settle Up" on the balance screen
- *   • Class diagram: Group · Expense · Split · Settlement
- *
- * ─── Required dependencies ───
- *   npx expo install expo-linear-gradient react-native-svg
- */
-
 import React, { useMemo, useState } from 'react';
 import {
   View,
