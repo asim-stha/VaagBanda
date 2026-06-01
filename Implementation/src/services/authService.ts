@@ -1,64 +1,74 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiService, ApiUser } from './apiService';
+import { supabase } from '../lib/supabase';
 
-const TOKEN_KEY = 'vaagbanda_token';
-const USER_KEY = 'vaagbanda_user';
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  avatarColor: string;
+}
 
-async function persistAuth(token: string, user: ApiUser) {
-  await AsyncStorage.multiSet([
-    [TOKEN_KEY, token],
-    [USER_KEY, JSON.stringify(user)],
-  ]);
+function avatarColorFromId(id: string): string {
+  const palette = ['#DC143C', '#1A2B5F', '#9C27B0', '#FF6F00', '#00838F', '#2E7D32', '#C62828', '#4527A0'];
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return palette[Math.abs(h) % palette.length];
+}
+
+async function fetchProfile(userId: string): Promise<AppUser | null> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('user_id, full_name, email, avatar_color')
+    .eq('user_id', userId)
+    .single();
+  if (!data) return null;
+  return {
+    id: data.user_id,
+    name: data.full_name || 'User',
+    email: data.email || '',
+    avatarColor: data.avatar_color || avatarColorFromId(userId),
+  };
 }
 
 export const authService = {
   async signUp(email: string, password: string, fullName: string) {
-    const data = await apiService.request<{ token: string; user: ApiUser }>('/auth/signup', {
-      method: 'POST',
-      body: { email, password, name: fullName },
-      token: null,
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('Signup failed — please try again');
+
+    const { error: profileError } = await supabase.from('profiles').insert({
+      user_id: data.user.id,
+      full_name: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      avatar_color: avatarColorFromId(data.user.id),
     });
-    await persistAuth(data.token, data.user);
-    return data;
+    if (profileError) throw new Error(profileError.message);
   },
 
   async signIn(email: string, password: string) {
-    const data = await apiService.request<{ token: string; user: ApiUser }>('/auth/login', {
-      method: 'POST',
-      body: { email, password },
-      token: null,
-    });
-    await persistAuth(data.token, data.user);
-    return data;
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
   },
 
   async signOut() {
-    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+    await supabase.auth.signOut();
   },
 
   async resetPassword(email: string) {
-    return apiService.request('/auth/forgot-password', {
-      method: 'POST',
-      body: { email },
-      token: null,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (error) throw new Error(error.message);
   },
 
-  async getSession() {
-    const [token, userRaw] = await Promise.all([
-      AsyncStorage.getItem(TOKEN_KEY),
-      AsyncStorage.getItem(USER_KEY),
-    ]);
-
-    if (!token || !userRaw) return null;
-    return {
-      access_token: token,
-      user: JSON.parse(userRaw) as ApiUser,
-    };
+  async getSession(): Promise<{ access_token: string; user: AppUser } | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+    const user = await fetchProfile(session.user.id);
+    if (!user) return null;
+    return { access_token: session.access_token, user };
   },
 
-  async getProfile() {
-    const userRaw = await AsyncStorage.getItem(USER_KEY);
-    return userRaw ? JSON.parse(userRaw) as ApiUser : null;
+  async getProfile(): Promise<AppUser | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    return fetchProfile(user.id);
   },
 };

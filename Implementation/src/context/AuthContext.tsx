@@ -1,14 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { ApiUser } from '../services/apiService';
-import { authService } from '../services/authService';
+import { AppUser, authService } from '../services/authService';
 
 interface LocalSession {
   access_token: string;
-  user: ApiUser;
+  user: AppUser;
 }
 
 interface AuthContextType {
-  user: ApiUser | null;
+  user: AppUser | null;
   session: LocalSession | null;
   loading: boolean;
   refreshAuth: () => Promise<void>;
@@ -24,7 +23,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<ApiUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<LocalSession | null>(null);
   const [loading, setLoading] = useState(true);
 
