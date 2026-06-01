@@ -283,7 +283,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const displayUser = useMemo(() => {
     return {
       id: authUser?.id || user.id,
-      name: authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || user.name,
+      name: authUser?.name || authUser?.email?.split('@')[0] || user.name,
       email: authUser?.email || '',
       avatarColor: user.avatarColor,
     };

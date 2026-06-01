@@ -1,90 +1,64 @@
-import { supabase } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiService, ApiUser } from './apiService';
+
+const TOKEN_KEY = 'vaagbanda_token';
+const USER_KEY = 'vaagbanda_user';
+
+async function persistAuth(token: string, user: ApiUser) {
+  await AsyncStorage.multiSet([
+    [TOKEN_KEY, token],
+    [USER_KEY, JSON.stringify(user)],
+  ]);
+}
 
 export const authService = {
-  /**
-   * Signs up a new user with email and password, and inserts their profile
-   */
   async signUp(email: string, password: string, fullName: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
+    const data = await apiService.request<{ token: string; user: ApiUser }>('/auth/signup', {
+      method: 'POST',
+      body: { email, password, name: fullName },
+      token: null,
     });
-
-    if (error) throw error;
-    if (!data.user) throw new Error('No user data returned from signup.');
-
-    // Direct insertion into the profiles table to match the user schema.
-    // If you have a Supabase database trigger doing this automatically, this will just be a safe backup
-    // or upsert. Let's do an upsert.
-    const { error: profileError } = await supabase.from('profiles').upsert({
-      user_id: data.user.id,
-      full_name: fullName,
-      email: email,
-    });
-
-    if (profileError) {
-      console.warn('Profile creation failed or profile already exists:', profileError.message);
-      // We don't throw here because the user is successfully created in auth.users
-    }
-
+    await persistAuth(data.token, data.user);
     return data;
   },
 
-  /**
-   * Signs in an existing user
-   */
   async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const data = await apiService.request<{ token: string; user: ApiUser }>('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+      token: null,
     });
-    if (error) throw error;
+    await persistAuth(data.token, data.user);
     return data;
   },
 
-  /**
-   * Signs out the current user
-   */
   async signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
   },
 
-  /**
-   * Resets password for an email
-   */
   async resetPassword(email: string) {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'vaagbanda://reset-password',
+    return apiService.request('/auth/forgot-password', {
+      method: 'POST',
+      body: { email },
+      token: null,
     });
-    if (error) throw error;
-    return data;
   },
 
-  /**
-   * Gets the current session
-   */
   async getSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return session;
+    const [token, userRaw] = await Promise.all([
+      AsyncStorage.getItem(TOKEN_KEY),
+      AsyncStorage.getItem(USER_KEY),
+    ]);
+
+    if (!token || !userRaw) return null;
+    return {
+      access_token: token,
+      user: JSON.parse(userRaw) as ApiUser,
+    };
   },
 
-  /**
-   * Gets the current user profile from public.profiles
-   */
-  async getProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    if (error) throw error;
-    return data;
+  async getProfile() {
+    const userRaw = await AsyncStorage.getItem(USER_KEY);
+    return userRaw ? JSON.parse(userRaw) as ApiUser : null;
   },
 };

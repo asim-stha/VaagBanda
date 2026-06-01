@@ -1,0 +1,12 @@
+{
+  "name": "vaagbanda-backend",
+  "version": "1.0.0",
+  "description": "Dependency-free REST API for the VaagBanda expense splitting app.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "private": true
+}
