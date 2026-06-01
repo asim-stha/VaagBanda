@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppUser, authService } from '../services/authService';
+import { supabase } from '../lib/supabase';
 
 interface LocalSession {
   access_token: string;
@@ -40,6 +41,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN') {
+        const nextSession = await authService.getSession();
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {

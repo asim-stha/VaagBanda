@@ -65,6 +65,33 @@ CREATE TABLE settlements (
     created_at    TIMESTAMP DEFAULT NOW()
 );
 
+-- ─── Auto-create profile on signup ──────────────────────────────────────────
+-- Runs as SECURITY DEFINER so it bypasses RLS (user has no session yet at
+-- signup time when email confirmation is enabled).
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  palette TEXT[] := ARRAY['#DC143C','#1A2B5F','#9C27B0','#FF6F00','#00838F','#2E7D32','#C62828','#4527A0'];
+  color   TEXT;
+BEGIN
+  color := palette[(abs(hashtext(NEW.id::text)) % array_length(palette, 1)) + 1];
+  INSERT INTO public.profiles (user_id, full_name, email, avatar_color)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', 'User'),
+    NEW.email,
+    color
+  )
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
 -- ─── Row Level Security ───────────────────────────────────────────────────────
 -- All authenticated users can read/write all rows (MVP policy).
 -- Tighten these policies before going to production.

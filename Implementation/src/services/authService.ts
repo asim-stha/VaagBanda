@@ -30,18 +30,20 @@ async function fetchProfile(userId: string): Promise<AppUser | null> {
 }
 
 export const authService = {
-  async signUp(email: string, password: string, fullName: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+  async signUp(email: string, password: string, fullName: string): Promise<{ needsVerification: boolean }> {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName.trim() } },
+    });
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error('Signup failed — please try again');
+    return { needsVerification: data.session === null };
+  },
 
-    const { error: profileError } = await supabase.from('profiles').insert({
-      user_id: data.user.id,
-      full_name: fullName.trim(),
-      email: email.trim().toLowerCase(),
-      avatar_color: avatarColorFromId(data.user.id),
-    });
-    if (profileError) throw new Error(profileError.message);
+  async resendVerification(email: string) {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) throw new Error(error.message);
   },
 
   async signIn(email: string, password: string) {

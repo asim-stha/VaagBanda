@@ -8,6 +8,7 @@ import SplashScreen from './src/screens/auth/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
 import HomeScreen from './src/screens/home/HomeScreen';
 import GroupDetailScreen from './src/screens/groups/GroupDetailScreen';
 import CreateGroupScreen from './src/screens/groups/CreateGroupScreen';
@@ -19,6 +20,7 @@ type Screen =
  | 'login'
  | 'signup'
  | 'forgot'
+ | 'verify-email'
  | 'home'
  | 'create-group'
  | 'group'
@@ -38,6 +40,7 @@ export default function App() {
 function AppContent() {
  const { user, loading, refreshAuth } = useAuth();
  const [screen, setScreen] = useState<Screen>('splash');
+ const [pendingEmail, setPendingEmail] = useState('');
  const [activeTab, setActiveTab] = useState<Tab>('home');
  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
  const [groups, setGroups] = useState<GroupSummary[]>([]);
@@ -74,12 +77,13 @@ function AppContent() {
  useEffect(() => {
    if (loading) return;
 
+   const authScreens = ['splash', 'login', 'signup', 'forgot', 'verify-email'];
    if (user) {
-     if (['splash', 'login', 'signup', 'forgot'].includes(screen)) {
+     if (authScreens.includes(screen)) {
        setScreen('home');
      }
      loadGroups();
-   } else if (!['splash', 'login', 'signup', 'forgot'].includes(screen)) {
+   } else if (!authScreens.includes(screen)) {
      setScreen('login');
    }
  }, [user, loading]);
@@ -94,10 +98,15 @@ function AppContent() {
    return React.createElement(SignupScreen, {
      onGoToLogin: () => setScreen('login'),
      onSignup: async (data: any) => {
-       await authService.signUp(data.email, data.password, data.name);
-       await refreshAuth();
-       await loadGroups();
-       setScreen('home');
+       const { needsVerification } = await authService.signUp(data.email, data.password, data.name);
+       if (needsVerification) {
+         setPendingEmail(data.email.trim());
+         setScreen('verify-email');
+       } else {
+         await refreshAuth();
+         await loadGroups();
+         setScreen('home');
+       }
      },
      onGoogleSignup: () => Alert.alert('VaagBanda', 'Google signup is not connected yet.'),
      onAppleSignup: () => Alert.alert('VaagBanda', 'Apple signup is not connected yet.'),
@@ -106,7 +115,15 @@ function AppContent() {
    });
  }
 
- if (screen === 'forgot') {
+ if (screen === 'verify-email') {
+   return React.createElement(VerifyEmailScreen, {
+     email: pendingEmail,
+     onResend: () => authService.resendVerification(pendingEmail),
+     onGoToLogin: () => setScreen('login'),
+   });
+ }
+
+if (screen === 'forgot') {
    return React.createElement(ForgotPasswordScreen, {
      onGoToLogin: () => setScreen('login'),
      onSubmit: async (email: string) => {
