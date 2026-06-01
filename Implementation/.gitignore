@@ -35,6 +35,9 @@ yarn-error.*
 .env.*
 !.env.example
 
+# backend runtime data
+Backend/data/*.json
+
 # typescript
 *.tsbuildinfo
 

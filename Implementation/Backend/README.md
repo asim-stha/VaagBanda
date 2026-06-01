@@ -5,8 +5,8 @@ Dependency-free Node.js REST API for the VaagBanda expense-splitting app.
 ## Run
 
 ```powershell
-cd Backend
-npm start
+cd Implementation\Backend
+npm.cmd start
 ```
 
 The API starts on `http://localhost:4000`. Set `PORT=4001` to use another port.
@@ -49,4 +49,4 @@ Invoke-RestMethod -Method Post http://localhost:4000/groups/g1/expenses `
   -Body '{"description":"Snacks","amount":500,"paidBy":"u1","participants":["u1","u2"],"shares":{"u1":250,"u2":250},"category":"food"}'
 ```
 
-Data is stored in `Backend/data/db.json`, which is created automatically on first run.
+Data is stored in `Implementation/Backend/data/db.json`, which is created automatically on first run.
