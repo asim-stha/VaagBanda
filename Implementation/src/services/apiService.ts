@@ -10,7 +10,7 @@ const envApiUrl = typeof process !== 'undefined'
   ? process.env?.EXPO_PUBLIC_API_URL
   : undefined;
 
-export const API_BASE_URL = envApiUrl || 'http://172.19.22.126:4000';
+export const API_BASE_URL = envApiUrl || 'http://localhost:4000';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
