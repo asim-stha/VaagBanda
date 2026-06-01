@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+.env
+.env.*
+!.env.example
+Implementation/.env
+Implementation/.env.*
+!Implementation/.env.example
