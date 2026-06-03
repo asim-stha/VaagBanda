@@ -36,6 +36,7 @@ import ProfileScreen from './src/screens/tabs/ProfileScreen';
 
 // Settings & Profile
 import NotificationSettingsScreen from './src/screens/settings/NotificationSettingsScreen';
+import SecurityPrivacyScreen from './src/screens/settings/SecurityPrivacyScreen';
 import EditProfileScreen from './src/screens/profile/EditProfileScreen';
 
 // Analytics
@@ -62,6 +63,7 @@ type Screen =
   | 'scan-receipt'
   | 'select-group'
   | 'notification-settings'
+  | 'security-privacy'
   | 'edit-profile'
   | 'analytics'
   | 'export';
@@ -392,6 +394,14 @@ function AppNavigator() {
     );
   }
 
+  if (screen === 'security-privacy') {
+    return (
+      <SecurityPrivacyScreen
+        onBack={() => setScreen('home')}
+      />
+    );
+  }
+
   if (screen === 'edit-profile') {
     return (
       <EditProfileScreen
@@ -429,6 +439,7 @@ function AppNavigator() {
         onOpenNotifications={() => setActiveTab('activity')}
         onEditProfile={() => setScreen('edit-profile')}
         onNotificationSettings={() => setScreen('notification-settings')}
+        onSecurityPrivacy={() => setScreen('security-privacy')}
         onLogout={async () => {
           await signOut();
           // useEffect above detects user → null and goes to 'login'

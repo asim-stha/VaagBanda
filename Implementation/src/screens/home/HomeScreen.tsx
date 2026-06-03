@@ -162,6 +162,7 @@ interface HomeScreenProps {
   hasUnreadNotifications?: boolean;
   onNotificationSettings?: () => void;
   onEditProfile?: () => void;
+  onSecurityPrivacy?: () => void;
   onLogout?: () => void;
   refreshKey?: number;
 }
@@ -270,6 +271,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   hasUnreadNotifications = true,
   onNotificationSettings,
   onEditProfile,
+  onSecurityPrivacy,
   onLogout,
   refreshKey = 0,
 }) => {
@@ -535,6 +537,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           user={displayUser}
           onEditProfile={onEditProfile}
           onNotificationPrefs={onNotificationSettings}
+          onSecurityPrivacy={onSecurityPrivacy}
           onAbout={() => {
             Linking.openURL('https://asim-stha.github.io/VaagBanda/landingpage/');
           }}
