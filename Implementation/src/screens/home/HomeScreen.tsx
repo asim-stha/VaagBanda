@@ -10,6 +10,7 @@ import {
   StatusBar,
   SafeAreaView,
   Image,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
@@ -170,12 +171,12 @@ interface HomeScreenProps {
   onScanReceipt?: () => void;
   onCreateGroup?: () => void;
   onOpenNotifications?: () => void;
-  onEditProfile?: () => void;
-  onNotificationSettings?: () => void;
-  onLogout?: () => void;
   onTabChange?: (tab: 'home' | 'groups' | 'activity' | 'profile') => void;
   activeTab?: 'home' | 'groups' | 'activity' | 'profile';
   hasUnreadNotifications?: boolean;
+  onNotificationSettings?: () => void;
+  onEditProfile?: () => void;
+  onLogout?: () => void;
 }
 
 /* ─── QUICK ACTION CARD ────────────────────────────────────── */
@@ -282,6 +283,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onTabChange,
   activeTab = 'home',
   hasUnreadNotifications = true,
+  onNotificationSettings,
+  onEditProfile,
+  onLogout,
 }) => {
   const { signOut, user: authUser } = useAuth();
 
@@ -310,42 +314,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const renderContent = () => {
-    if (activeTab === 'profile') {
-      return (
-        <View style={[styles.section, { marginTop: 24 }]}>
-          {/* Profile Details Card */}
-          <View style={styles.profileCard}>
-            <View style={styles.profileHeader}>
-              <Avatar user={displayUser} size={80} />
-              <Text style={styles.profileName}>{displayUser.name}</Text>
-              <Text style={styles.profileEmail}>{displayUser.email}</Text>
-            </View>
-
-            <View style={styles.profileDivider} />
-
-            <View style={styles.profileDetailsRow}>
-              <Text style={styles.profileDetailsLabel}>Account ID</Text>
-              <Text style={styles.profileDetailsValue} numberOfLines={1}>
-                {displayUser.id}
-              </Text>
-            </View>
-          </View>
-
-          {/* Sign Out Action Button */}
-          <TouchableOpacity activeOpacity={0.85} onPress={signOut} style={{ marginTop: 24 }}>
-            <LinearGradient
-              colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.signOutBtn}
-            >
-              <Text style={styles.signOutBtnText}>Sign Out</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
     return (
       <>
         {/* ─── HEADER ─── */}
@@ -555,7 +523,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       </SafeAreaView>
     );
   }
-
   if (activeTab === 'activity') {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -571,9 +538,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
         <ProfileScreen
-          onLogout={() => {
-            console.log('logout');
+          user={displayUser}
+          onEditProfile={onEditProfile}
+          onNotificationPrefs={onNotificationSettings}
+          onAbout={() => {
+            Linking.openURL('https://asim-stha.github.io/VaagBanda/landingpage/');
           }}
+          onLogout={onLogout || signOut}
         />
         <TabBar active={activeTab} onTabChange={onTabChange} hasUnread={hasUnreadNotifications} />
       </SafeAreaView>
