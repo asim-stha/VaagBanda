@@ -27,7 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "VaagBanda needs access to your photos to set a profile picture.",
+          "cameraPermission": "VaagBanda needs camera access to take a profile photo."
+        }
+      ]
     ]
   }
 }
