@@ -15,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { apiService, FriendSummary, GroupSummary } from '../../services/apiService';
+import { apiService, FriendSummary, GroupSummary, ProfileSearchResult } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
 import { useAuth } from '../../context/AuthContext';
@@ -32,8 +32,10 @@ const COLORS = {
   GRAY100: '#EEF1F6',
   GRAY200: '#E1E5EE',
   GRAY400: '#9AA3B5',
+  GRAY500: '#7B8496',
   GRAY600: '#5A6478',
   GRAY800: '#1F2A44',
+  GRAY900: '#111827',
   SUCCESS: '#27AE60',
 };
 
@@ -293,6 +295,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [friendQuery, setFriendQuery] = useState('');
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [addFriendQuery, setAddFriendQuery] = useState('');
+  const [addFriendResults, setAddFriendResults] = useState<ProfileSearchResult[]>([]);
+  const [addFriendSearchLoading, setAddFriendSearchLoading] = useState(false);
+  const [selectedFriendToAdd, setSelectedFriendToAdd] = useState<ProfileSearchResult | null>(null);
+  const [targetGroupId, setTargetGroupId] = useState<string | null>(null);
+  const [addingFriend, setAddingFriend] = useState(false);
 
   useEffect(() => {
     apiService.getGroups()
@@ -309,6 +318,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       .catch(() => setFriends([]))
       .finally(() => setLoadingFriends(false));
   }, [activeTab, refreshKey]);
+
+  useEffect(() => {
+    const q = addFriendQuery.trim();
+    if (!showAddFriend || q.length < 2) {
+      setAddFriendResults([]);
+      return;
+    }
+
+    let cancelled = false;
+    setAddFriendSearchLoading(true);
+    apiService.searchProfiles(q, authUser?.id ? [authUser.id] : [])
+      .then(({ data }) => {
+        if (!cancelled) setAddFriendResults(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAddFriendResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAddFriendSearchLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [showAddFriend, addFriendQuery, authUser?.id]);
 
   const displayUser = useMemo(() => {
     const id = authUser?.id || '';
@@ -366,6 +398,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
+  const resetAddFriend = () => {
+    setAddFriendQuery('');
+    setAddFriendResults([]);
+    setSelectedFriendToAdd(null);
+    setTargetGroupId(null);
+  };
+
+  const handleAddFriendToGroup = async () => {
+    if (!selectedFriendToAdd || !targetGroupId) return;
+
+    setAddingFriend(true);
+    try {
+      await apiService.addGroupMember(targetGroupId, selectedFriendToAdd.id);
+      const [{ data: nextFriends }, { data: nextGroups }] = await Promise.all([
+        apiService.getFriends(),
+        apiService.getGroups(),
+      ]);
+      setFriends(nextFriends);
+      setGroups(nextGroups);
+      resetAddFriend();
+      setShowAddFriend(false);
+      Alert.alert('Friend added', `${selectedFriendToAdd.name} was added to the selected group.`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Unable to add friend');
+    } finally {
+      setAddingFriend(false);
+    }
+  };
+
   const renderFriends = () => {
     const friendCount = filteredFriends.length;
     return (
@@ -392,12 +453,103 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Add Friend', 'Invite a friend by opening a shared group from Groups or use the group settings invite flow.')}
+            onPress={() => {
+              setShowAddFriend(v => !v);
+              if (showAddFriend) resetAddFriend();
+            }}
             style={styles.addFriendButton}
           >
             <Icon name="plus" size={16} color={COLORS.WHITE} />
             <Text style={styles.addFriendText}>Add Friend</Text>
           </TouchableOpacity>
+
+          {showAddFriend && (
+            <View style={styles.addFriendPanel}>
+              <TextInput
+                value={addFriendQuery}
+                onChangeText={(text) => {
+                  setAddFriendQuery(text);
+                  setSelectedFriendToAdd(null);
+                  setTargetGroupId(null);
+                }}
+                placeholder="Search by name or email"
+                placeholderTextColor={COLORS.GRAY400}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.addFriendSearch}
+              />
+
+              {addFriendQuery.trim().length < 2 ? (
+                <Text style={styles.addFriendHint}>Type at least 2 characters.</Text>
+              ) : addFriendSearchLoading ? (
+                <ActivityIndicator color={COLORS.CRIMSON} style={{ paddingVertical: 12 }} />
+              ) : addFriendResults.length === 0 ? (
+                <Text style={styles.addFriendHint}>No users found.</Text>
+              ) : (
+                addFriendResults.map(profile => {
+                  const selected = selectedFriendToAdd?.id === profile.id;
+                  return (
+                    <TouchableOpacity
+                      key={profile.id}
+                      onPress={() => {
+                        setSelectedFriendToAdd(profile);
+                        setTargetGroupId(null);
+                      }}
+                      activeOpacity={0.75}
+                      style={[styles.addFriendResult, selected && styles.addFriendResultActive]}
+                    >
+                      <Avatar user={{ id: profile.id, name: profile.name, avatarColor: profile.avatarColor }} size={34} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.addFriendName}>{profile.name}</Text>
+                        <Text style={styles.addFriendEmail}>{profile.email}</Text>
+                      </View>
+                      {selected && <Icon name="chevron" size={15} color={COLORS.CRIMSON} />}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              {selectedFriendToAdd && (
+                <View style={styles.addFriendGroups}>
+                  <Text style={styles.addFriendSectionLabel}>Choose group</Text>
+                  {groups.length === 0 ? (
+                    <Text style={styles.addFriendHint}>Create a group first.</Text>
+                  ) : (
+                    groups.map(group => {
+                      const selected = targetGroupId === group.id;
+                      return (
+                        <TouchableOpacity
+                          key={group.id}
+                          onPress={() => setTargetGroupId(group.id)}
+                          activeOpacity={0.75}
+                          style={[styles.addFriendGroupRow, selected && styles.addFriendGroupRowActive]}
+                        >
+                          <Text style={styles.addFriendGroupEmoji}>{group.emoji}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.addFriendGroupName}>{group.name}</Text>
+                            <Text style={styles.addFriendEmail}>{group.memberCount} members</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    disabled={!targetGroupId || addingFriend}
+                    onPress={handleAddFriendToGroup}
+                    style={[styles.addFriendSubmit, (!targetGroupId || addingFriend) && styles.addFriendSubmitDisabled]}
+                  >
+                    {addingFriend ? (
+                      <ActivityIndicator color={COLORS.WHITE} size="small" />
+                    ) : (
+                      <Text style={styles.addFriendSubmitText}>Add to group</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={[styles.balanceCard, { marginTop: 20 }]}> 
             <View style={styles.balanceRow}>
@@ -1064,6 +1216,99 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
     marginLeft: 8,
+  },
+  addFriendPanel: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  addFriendSearch: {
+    backgroundColor: COLORS.GHOST,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 14,
+    color: COLORS.GRAY800,
+    borderWidth: 1,
+    borderColor: COLORS.GRAY200,
+  },
+  addFriendHint: {
+    color: COLORS.GRAY600,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  addFriendResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  addFriendResultActive: {
+    backgroundColor: 'rgba(220,20,60,0.08)',
+  },
+  addFriendName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.GRAY800,
+  },
+  addFriendEmail: {
+    fontSize: 11,
+    color: COLORS.GRAY600,
+    marginTop: 2,
+  },
+  addFriendGroups: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.GRAY100,
+    paddingTop: 12,
+  },
+  addFriendSectionLabel: {
+    fontSize: 11,
+    color: COLORS.GRAY600,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  addFriendGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  addFriendGroupRowActive: {
+    backgroundColor: 'rgba(26,43,95,0.08)',
+  },
+  addFriendGroupEmoji: {
+    fontSize: 22,
+    marginRight: 10,
+  },
+  addFriendGroupName: {
+    fontSize: 13,
+    color: COLORS.GRAY800,
+    fontWeight: '800',
+  },
+  addFriendSubmit: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    backgroundColor: COLORS.CRIMSON,
+  },
+  addFriendSubmitDisabled: {
+    backgroundColor: COLORS.GRAY400,
+  },
+  addFriendSubmitText: {
+    color: COLORS.WHITE,
+    fontSize: 13,
+    fontWeight: '800',
   },
   friendBlock: {
     marginBottom: 12,
