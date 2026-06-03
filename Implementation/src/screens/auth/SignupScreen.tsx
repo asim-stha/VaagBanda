@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   Image,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Circle, Line, Polyline } from 'react-native-svg';
@@ -37,7 +38,7 @@ const COLORS = {
 };
 
 /* ─── ICONS ────────────────────────────────────────────────── */
-type IconName = 'user' | 'mail' | 'lock' | 'eye' | 'eyeOff' | 'check' | 'back';
+type IconName = 'user' | 'mail' | 'lock' | 'eye' | 'eyeOff' | 'check' | 'back' | 'close';
 
 const Icon = ({
   name,
@@ -107,6 +108,13 @@ const Icon = ({
         <Svg {...props}>
           <Line x1="19" y1="12" x2="5" y2="12" />
           <Polyline points="12 19 5 12 12 5" />
+        </Svg>
+      );
+    case 'close':
+      return (
+        <Svg {...props}>
+          <Line x1="18" y1="6" x2="6" y2="18" />
+          <Line x1="6" y1="6" x2="18" y2="18" />
         </Svg>
       );
     default:
@@ -215,6 +223,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({
   const [agree, setAgree] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeDoc, setActiveDoc] = useState<'terms' | 'privacy' | null>(null);
 
   const strength = useMemo(() => calcStrength(password), [password]);
   const canSubmit = agree && name.length > 0 && email.length > 0 && password.length >= 8 && !submitting;
@@ -345,9 +354,25 @@ const SignupScreen: React.FC<SignupScreenProps> = ({
               </View>
               <Text style={styles.termsText}>
                 I agree to VaagBanda's{' '}
-                <Text style={styles.termsLink} onPress={onOpenTerms}>Terms of Service</Text>
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => {
+                    onOpenTerms?.();
+                    setActiveDoc('terms');
+                  }}
+                >
+                  Terms of Service
+                </Text>
                 {' '}and{' '}
-                <Text style={styles.termsLink} onPress={onOpenPrivacy}>Privacy Policy</Text>
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => {
+                    onOpenPrivacy?.();
+                    setActiveDoc('privacy');
+                  }}
+                >
+                  Privacy Policy
+                </Text>
               </Text>
             </TouchableOpacity>
 
@@ -408,6 +433,124 @@ const SignupScreen: React.FC<SignupScreenProps> = ({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* TERMS & PRIVACY MODAL */}
+      <Modal
+        visible={activeDoc !== null}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setActiveDoc(null)}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+          <LinearGradient
+            colors={[COLORS.BLUE_DARK, COLORS.BLUE]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.modalHeader}
+          >
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>
+                {activeDoc === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setActiveDoc(null)}
+                style={styles.modalCloseBtn}
+                activeOpacity={0.7}
+              >
+                <Icon name="close" size={18} color={COLORS.WHITE} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalHeaderSub}>
+              Last updated: June 2026
+            </Text>
+          </LinearGradient>
+
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+            {activeDoc === 'terms' ? (
+              <View>
+                <Text style={styles.docHeading}>1. Acceptance of Terms</Text>
+                <Text style={styles.docParagraph}>
+                  Welcome to VaagBanda. By creating an account, accessing, or using our mobile application, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the application.
+                </Text>
+
+                <Text style={styles.docHeading}>2. Service Description</Text>
+                <Text style={styles.docParagraph}>
+                  VaagBanda is a shared expense and group budget tracking utility. We facilitate the recording, splitting, and calculation of informal debts and expenses among groups of individuals. VaagBanda does not process actual payments or act as a licensed financial institution.
+                </Text>
+
+                <Text style={styles.docHeading}>3. User Account & Conduct</Text>
+                <Text style={styles.docParagraph}>
+                  You are responsible for maintaining the confidentiality of your account credentials. You agree that all logged transactions, expense distributions, and details are accurate. You may not use the service for any illegal activities or unauthorized financial tracking.
+                </Text>
+
+                <Text style={styles.docHeading}>4. Splitting & Settlements</Text>
+                <Text style={styles.docParagraph}>
+                  Calculations provided by the App are for informational purposes based on user inputs. Any financial settlements are resolved peer-to-peer outside of the App unless explicitly integrated. You acknowledge that VaagBanda is not liable for unpaid debts or disputes between members.
+                </Text>
+
+                <Text style={styles.docHeading}>5. Termination of Service</Text>
+                <Text style={styles.docParagraph}>
+                  We reserve the right to suspend or terminate your account at our sole discretion, without notice, if we believe your conduct violates these Terms, is harmful to other users, or violates applicable local laws.
+                </Text>
+
+                <Text style={styles.docHeading}>6. Changes to Terms</Text>
+                <Text style={styles.docParagraph}>
+                  We may periodically modify these terms to reflect changes in our service. Continued use of the app after such updates constitutes acceptance of the new Terms of Service.
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.docHeading}>1. Information We Collect</Text>
+                <Text style={styles.docParagraph}>
+                  To provide our service, we collect personal information you voluntarily provide, including your name, email address, password, profile details, group configurations, expense records, and uploaded receipt images for scanning features.
+                </Text>
+
+                <Text style={styles.docHeading}>2. How We Use Information</Text>
+                <Text style={styles.docParagraph}>
+                  We use your information to operate and maintain your account, calculate and present group balances, send transaction notifications, and improve our services (such as OCR accuracy on scanned receipts). We do not sell your personal data.
+                </Text>
+
+                <Text style={styles.docHeading}>3. Sharing of Information</Text>
+                <Text style={styles.docParagraph}>
+                  Your display name, email address, and avatar are shared with members of the groups you create or join to facilitate transparent expense tracking. Transactions you enter are visible to all members of the corresponding groups.
+                </Text>
+
+                <Text style={styles.docHeading}>4. Data Security & Storage</Text>
+                <Text style={styles.docParagraph}>
+                  We implement industry-standard administrative, technical, and physical security measures (including secure database servers and transmission encryption) to protect your personal data from unauthorized access or disclosure.
+                </Text>
+
+                <Text style={styles.docHeading}>5. Third-Party Services</Text>
+                <Text style={styles.docParagraph}>
+                  Our app uses third-party analytics and backend storage services (such as Supabase). These third parties process data in accordance with their respective privacy policies.
+                </Text>
+
+                <Text style={styles.docHeading}>6. Your Rights & Choices</Text>
+                <Text style={styles.docParagraph}>
+                  You may view, edit, or delete your account information at any time through the profile settings. If you delete your account, your profile info will be permanently purged, though past recorded transactions in existing groups may remain for historical calculation.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              onPress={() => setActiveDoc(null)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalCloseBtnPrimary}
+              >
+                <Text style={styles.modalCloseBtnText}>I Understand</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -626,6 +769,81 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 13, color: COLORS.GRAY600 },
   footerLinkText: { fontSize: 13, color: COLORS.CRIMSON, fontWeight: '700' },
+
+  /* MODAL STYLES */
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: COLORS.GHOST,
+  },
+  modalHeader: {
+    paddingTop: Platform.OS === 'ios' ? 10 : 20,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    color: COLORS.WHITE,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderSub: {
+    color: 'rgba(255,255,255,0.70)',
+    fontSize: 12,
+    marginTop: 6,
+  },
+  modalScroll: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  modalScrollContent: {
+    paddingBottom: 40,
+  },
+  docHeading: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.GRAY800,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  docParagraph: {
+    fontSize: 13,
+    color: COLORS.GRAY600,
+    lineHeight: 20,
+    marginBottom: 10,
+    textAlign: 'justify',
+  },
+  modalFooter: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: COLORS.WHITE,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.GRAY200,
+  },
+  modalCloseBtnPrimary: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalCloseBtnText: {
+    color: COLORS.WHITE,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
 });
 
 export default SignupScreen;
