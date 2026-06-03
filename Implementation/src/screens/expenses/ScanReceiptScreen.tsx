@@ -1,10 +1,3 @@
-/**
- * VaagBanda — ScanReceiptScreen.tsx
- * Camera capture → OCR extract amount/date/vendor → pre-fill AddExpense.
- * Maps to SRS §4.3.3 (receipt scanning). Increment 3 feature.
- * For now shows camera placeholder + manual entry option.
- */
-
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

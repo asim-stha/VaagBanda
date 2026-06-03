@@ -288,6 +288,12 @@ export default function App() {
         onScanReceipt={() => setScreen('scan-receipt')}
         onCreateGroup={() => setScreen('create-group')}
         onOpenNotifications={() => setActiveTab('activity')}
+        onEditProfile={() => setScreen('edit-profile')}
+        onNotificationSettings={() => setScreen('notification-settings')}
+        onLogout={() => {
+          console.log('logout');
+          setScreen('login');
+        }}
       />
     );
   }
