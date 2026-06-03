@@ -44,8 +44,7 @@ const EditProfileScreen: React.FC<Props> = ({
     const [newPw, setNewPw] = useState('');
     const [saved, setSaved] = useState(false);
 
-    const hasChanges = name !== resolvedName || email !== resolvedEmail || newPw.length > 0;
-    const canSave = hasChanges && name.trim().length > 0 && email.includes('@');
+    const canSave = name.trim().length > 0 && email.includes('@');
 
     const handleSave = () => {
         if (!canSave) return;

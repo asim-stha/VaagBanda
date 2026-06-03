@@ -37,6 +37,7 @@ import ProfileScreen from './src/screens/tabs/ProfileScreen';
 import NotificationSettingsScreen from './src/screens/settings/NotificationSettingsScreen';
 import SecurityPrivacyScreen from './src/screens/settings/SecurityPrivacyScreen';
 import EditProfileScreen from './src/screens/profile/EditProfileScreen';
+import { supabase } from './src/lib/supabase';
 
 // Analytics
 import AnalyticsScreen from './src/screens/analytics/AnalyticsScreen';
@@ -399,8 +400,29 @@ function AppNavigator() {
     return (
       <EditProfileScreen
         onBack={() => setScreen('home')}
-        onSave={(data) => {
-          console.log('Profile updated:', data);
+        onSave={async (data) => {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Update profile in database
+            await supabase
+              .from('profiles')
+              .update({
+                full_name: data.name,
+                email: data.email,
+              })
+              .eq('user_id', user.id);
+
+            // Update password if provided
+            if (data.newPassword && data.newPassword.length > 0) {
+              await supabase.auth.updateUser({
+                password: data.newPassword,
+              });
+            }
+          } catch (e: any) {
+            console.error('Profile update failed:', e.message);
+          }
           setScreen('home');
         }}
       />
