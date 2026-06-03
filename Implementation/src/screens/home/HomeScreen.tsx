@@ -345,7 +345,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const friendBalanceStats = useMemo(() => {
     const owesYou = friends.filter(f => f.totalBalance > 0).reduce((s, f) => s + f.totalBalance, 0);
     const youOwe = friends.filter(f => f.totalBalance < 0).reduce((s, f) => s + f.totalBalance, 0);
-    return { owesYou: round2(owesYou), youOwe: round2(youOwe) };
+    return {
+      owesYou: Number(owesYou.toFixed(2)),
+      youOwe: Number(youOwe.toFixed(2)),
+    };
   }, [friends]);
 
   const handleRemoveFriendFromGroup = async (friendId: string, groupId: string) => {
@@ -361,6 +364,133 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     } finally {
       setLoadingFriends(false);
     }
+  };
+
+  const renderFriends = () => {
+    const friendCount = filteredFriends.length;
+    return (
+      <>
+        <LinearGradient
+          colors={[COLORS.BLUE_DARK, COLORS.BLUE, COLORS.BLUE_MID]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={[styles.blob, styles.blob1]} />
+          <View style={[styles.blob, styles.blob2]} />
+
+          <View style={styles.topRow}>
+            <View>
+              <Text style={[styles.greetingLabel, { fontSize: 13 }]}>Friends</Text>
+              <Text style={[styles.greetingName, { fontSize: 24 }]}>Your network</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={[styles.balanceLabel, { color: COLORS.WHITE, marginBottom: 6 }]}>Contacts</Text>
+              <Text style={[styles.greetingName, { color: COLORS.WHITE, textAlign: 'right' }]}>{friendCount}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.balanceCard, { marginTop: 20 }]}> 
+            <View style={styles.balanceRow}>
+              <Text style={styles.balanceAmount}>{friendCount}</Text>
+              <Text style={styles.balanceCurrency}>friends</Text>
+            </View>
+            <View style={styles.friendStatsRow}>
+              <View style={styles.friendStatBox}>
+                <Text style={styles.friendStatValue}>{friendBalanceStats.owesYou >= 0 ? `+${fmt(friendBalanceStats.owesYou)}` : `-${fmt(Math.abs(friendBalanceStats.owesYou))}`}</Text>
+                <Text style={styles.friendStatLabel}>Owed to you</Text>
+              </View>
+              <View style={styles.friendStatBox}>
+                <Text style={styles.friendStatValue}>{friendBalanceStats.youOwe <= 0 ? `-${fmt(Math.abs(friendBalanceStats.youOwe))}` : `+${fmt(friendBalanceStats.youOwe)}`}</Text>
+                <Text style={styles.friendStatLabel}>You owe</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={[styles.section, { marginTop: 16 }]}> 
+          <TextInput
+            value={friendQuery}
+            onChangeText={setFriendQuery}
+            placeholder="Search friends"
+            placeholderTextColor={COLORS.GRAY400}
+            style={styles.friendSearch}
+          />
+
+          {loadingFriends ? (
+            <ActivityIndicator size="large" color={COLORS.CRIMSON} style={{ marginTop: 24 }} />
+          ) : filteredFriends.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🧑‍🤝‍🧑</Text>
+              <Text style={styles.emptyTitle}>No friends found</Text>
+              <Text style={styles.emptyDesc}>Friends appear when you share groups with other people.</Text>
+            </View>
+          ) : (
+            filteredFriends.map(friend => {
+              const isExpanded = friend.id === selectedFriendId;
+              const directionLabel = friend.totalBalance > 0 ? 'Friend owes you' : friend.totalBalance < 0 ? 'You owe friend' : 'Settled';
+              return (
+                <View key={friend.id} style={styles.friendBlock}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setSelectedFriendId(isExpanded ? null : friend.id)}
+                    style={styles.friendCard}
+                  >
+                    <Avatar user={{ id: friend.id, name: friend.name, avatarColor: friend.avatarColor }} size={44} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.friendName}>{friend.name}</Text>
+                      <Text style={styles.friendSubtitle}>{friend.groups.length} shared {friend.groups.length === 1 ? 'group' : 'groups'}</Text>
+                      <View style={styles.friendStatsRow}>
+                        <Text style={styles.friendMiniStat}>Unsettled {fmt(friend.totalUnsettled)}</Text>
+                        <Text style={styles.friendMiniStat}>Settled {fmt(friend.totalSettled)}</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.friendAmount, { color: friend.totalBalance > 0 ? COLORS.SUCCESS : friend.totalBalance < 0 ? COLORS.CRIMSON : COLORS.GRAY600 }]}>
+                        {friend.totalBalance > 0 ? `+${fmt(friend.totalBalance)}` : friend.totalBalance < 0 ? `-${fmt(Math.abs(friend.totalBalance))}` : '—'}
+                      </Text>
+                      <Text style={styles.friendStatus}>{directionLabel}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {isExpanded && (
+                    <View style={styles.friendDetailPanel}>
+                      <Text style={styles.sectionTitle}>Shared groups</Text>
+                      {friend.groups.map(group => (
+                        <View key={group.groupId} style={styles.friendGroupRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.friendGroupName}>{group.groupName}</Text>
+                            <Text style={styles.friendGroupMeta}>
+                              {group.currency} · {group.balance > 0 ? `+${fmt(group.balance)}` : group.balance < 0 ? `-${fmt(Math.abs(group.balance))}` : '—'}
+                            </Text>
+                          </View>
+                          {group.canRemove ? (
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              onPress={() => Alert.alert(
+                                'Remove friend',
+                                `Remove ${friend.name} from ${group.groupName}?`,
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Remove', style: 'destructive', onPress: () => handleRemoveFriendFromGroup(friend.id, group.groupId) },
+                                ]
+                              )}
+                              style={styles.removeFriendBtn}
+                            >
+                              <Text style={styles.removeFriendBtnText}>Remove</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </View>
+      </>
+    );
   };
 
   const renderContent = () => {
@@ -461,6 +591,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   // ─── TAB ROUTING (must be before the main return) ───────────
+
+  if (activeTab === 'friends') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderFriends()}
+        </ScrollView>
+        <TabBar active={activeTab} onTabChange={onTabChange} hasUnread={hasUnreadNotifications} />
+      </SafeAreaView>
+    );
+  }
 
   if (activeTab === 'groups') {
     const owedGroups = groups.filter(g => g.myBalance > 0).length;
@@ -880,6 +1026,113 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginTop: 1,
+  },
+
+  friendSearch: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: COLORS.GRAY800,
+    borderWidth: 1,
+    borderColor: COLORS.GRAY200,
+    marginBottom: 14,
+  },
+  friendBlock: {
+    marginBottom: 12,
+  },
+  friendCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#081A35',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  friendName: {
+    fontSize: 15,
+    color: COLORS.GRAY900,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  friendSubtitle: {
+    fontSize: 12,
+    color: COLORS.GRAY600,
+    marginBottom: 8,
+  },
+  friendAmount: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  friendStatus: {
+    fontSize: 11,
+    color: COLORS.GRAY600,
+    marginTop: 6,
+  },
+  friendStatsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  friendMiniStat: {
+    fontSize: 11,
+    color: COLORS.GRAY500,
+  },
+  friendDetailPanel: {
+    marginTop: 10,
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: COLORS.WHITE,
+    borderWidth: 1,
+    borderColor: COLORS.GRAY100,
+  },
+  friendGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  friendGroupName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.GRAY800,
+  },
+  friendGroupMeta: {
+    fontSize: 12,
+    color: COLORS.GRAY500,
+    marginTop: 2,
+  },
+  removeFriendBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(220,20,60,0.12)',
+  },
+  removeFriendBtnText: {
+    color: COLORS.CRIMSON,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  friendStatBox: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+  },
+  friendStatValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.GRAY900,
+  },
+  friendStatLabel: {
+    fontSize: 11,
+    color: COLORS.GRAY600,
+    marginTop: 4,
   },
 
   /* EMPTY STATE */

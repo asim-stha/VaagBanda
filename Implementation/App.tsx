@@ -67,7 +67,7 @@ type Screen =
   | 'analytics'
   | 'export';
 
-type Tab = 'home' | 'groups' | 'activity' | 'profile';
+type Tab = 'home' | 'friends' | 'groups' | 'activity' | 'profile';
 
 interface GroupContext {
   groupId: string;
