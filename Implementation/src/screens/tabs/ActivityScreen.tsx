@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService } from '../../services/apiService';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
 const COLORS = {
@@ -33,31 +34,24 @@ interface Notification {
   read: boolean;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: 'n1', icon: '💰', text: 'You added "Hotel — 2 nights" (NPR 8,000) to Pokhara Trip', time: '2 hours ago', read: false },
-  { id: 'n2', icon: '🍽️', text: 'Riya added "Dinner at lakeside" (NPR 2,500) to Pokhara Trip', time: 'Yesterday', read: false },
-  { id: 'n3', icon: '✅', text: 'Krishna settled NPR 500 with you in Apartment 304', time: 'Yesterday', read: false },
-  { id: 'n4', icon: '🚕', text: 'Bibek added "Taxi from airport" (NPR 1,500) to Pokhara Trip', time: '2 days ago', read: true },
-  { id: 'n5', icon: '👋', text: 'Sita joined Pokhara Trip', time: '3 days ago', read: true },
-  { id: 'n6', icon: '🪂', text: 'You added "Paragliding tickets" (NPR 6,000) to Pokhara Trip', time: '3 days ago', read: true },
-  { id: 'n7', icon: '⛵', text: 'Krishna added "Boat ride" (NPR 800) to Pokhara Trip', time: '3 days ago', read: true },
-  { id: 'n8', icon: '🔔', text: 'Reminder: You owe Bibek NPR 2,100 in Pokhara Trip', time: '4 days ago', read: true },
-  { id: 'n9', icon: '🏠', text: 'You created the group "Apartment 304"', time: 'Last week', read: true },
-  { id: 'n10', icon: '🍕', text: 'Asim invited you to "Friday Pizza Club"', time: 'Last week', read: true },
-];
-
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface ActivityScreenProps {
-  notifications?: Notification[];
   onNotificationTap?: (id: string) => void;
 }
 
 /* ─── MAIN COMPONENT ───────────────────────────────────────── */
-const ActivityScreen: React.FC<ActivityScreenProps> = ({
-  notifications = MOCK_NOTIFICATIONS,
-  onNotificationTap,
-}) => {
-  const [items, setItems] = useState(notifications);
+const ActivityScreen: React.FC<ActivityScreenProps> = ({ onNotificationTap }) => {
+  const [items, setItems] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiService.getActivity()
+      .then(({ data }) => {
+        setItems(data.map(item => ({ ...item, read: false })));
+      })
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const unreadCount = items.filter(n => !n.read).length;
 
@@ -107,7 +101,11 @@ const ActivityScreen: React.FC<ActivityScreenProps> = ({
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {items.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyDesc}>Loading activity…</Text>
+          </View>
+        ) : items.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🔕</Text>
             <Text style={styles.emptyTitle}>No notifications yet</Text>

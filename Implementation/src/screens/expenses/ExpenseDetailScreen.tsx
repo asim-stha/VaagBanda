@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { apiService } from '../../services/apiService';
+import { apiService, ExpenseDetail } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline, Circle } from 'react-native-svg';
 
@@ -34,35 +34,50 @@ const Avatar = ({ name, color, size = 36 }: { name: string; color: string; size?
 
 const fmt = (n: number) => Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-interface Split { name: string; avatarColor: string; amount: number; isPayer: boolean; }
-interface ExpenseData {
-    id: string; description: string; emoji: string; amount: number; currency: string;
-    paidByName: string; paidByColor: string; date: string; category: string;
-    groupName: string; splits: Split[]; note?: string;
-}
-
-const MOCK: ExpenseData = {
-    id: 'e1', description: 'Hotel — 2 nights', emoji: '🏨', amount: 8000, currency: 'NPR',
-    paidByName: 'Asim', paidByColor: C.CRIMSON, date: 'May 25, 2026 · 3:42 PM',
-    category: 'Stay', groupName: 'Pokhara Trip',
-    splits: [
-        { name: 'Asim', avatarColor: C.CRIMSON, amount: 1600, isPayer: true },
-        { name: 'Krishna', avatarColor: C.BLUE, amount: 1600, isPayer: false },
-        { name: 'Riya', avatarColor: '#9C27B0', amount: 1600, isPayer: false },
-        { name: 'Bibek', avatarColor: '#FF6F00', amount: 1600, isPayer: false },
-        { name: 'Sita', avatarColor: '#00838F', amount: 1600, isPayer: false },
-    ],
-    note: 'Booked via Agoda. Confirmation #AG-28491.',
-};
-
 interface Props {
-    expense?: ExpenseData;
+    expenseId?: string;
     onBack?: () => void;
     onEdit?: (id: string) => void;
     onDelete?: (id: string) => void;
 }
 
-const ExpenseDetailScreen: React.FC<Props> = ({ expense = MOCK, onBack, onEdit, onDelete }) => {
+const ExpenseDetailScreen: React.FC<Props> = ({ expenseId = '', onBack, onEdit, onDelete }) => {
+    const [expense, setExpense] = useState<ExpenseDetail | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!expenseId) { setLoading(false); return; }
+        setLoading(true);
+        apiService.getExpense(expenseId)
+            .then(({ data }) => setExpense(data))
+            .catch(err => setLoadError(err.message || 'Failed to load expense'))
+            .finally(() => setLoading(false));
+    }, [expenseId]);
+
+    if (loading) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: C.GRAY600, fontSize: 14 }}>Loading…</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (loadError || !expense) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                    <Text style={{ color: C.CRIMSON, fontSize: 14, textAlign: 'center' }}>{loadError || 'Expense not found'}</Text>
+                    <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
+                        <Text style={{ color: C.BLUE, fontWeight: '700' }}>Go back</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     const handleDelete = () => {
         Alert.alert('Delete expense', `Remove "${expense.description}"? This cannot be undone.`, [
             { text: 'Cancel', style: 'cancel' },

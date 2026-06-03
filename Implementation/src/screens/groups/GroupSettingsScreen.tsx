@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
     StatusBar, Alert,
@@ -37,14 +37,6 @@ const Avatar = ({ name, color, size = 36 }: { name: string; color: string; size?
 
 interface Member { id: string; name: string; avatarColor: string; role: 'admin' | 'member'; }
 
-const MOCK_MEMBERS: Member[] = [
-    { id: 'u1', name: 'Asim', avatarColor: C.CRIMSON, role: 'admin' },
-    { id: 'u2', name: 'Krishna', avatarColor: C.BLUE, role: 'member' },
-    { id: 'u3', name: 'Riya', avatarColor: '#9C27B0', role: 'member' },
-    { id: 'u4', name: 'Bibek', avatarColor: '#FF6F00', role: 'member' },
-    { id: 'u5', name: 'Sita', avatarColor: '#00838F', role: 'member' },
-];
-
 interface Props {
     groupId?: string;
     groupName?: string; groupEmoji?: string; groupCurrency?: string;
@@ -56,11 +48,31 @@ interface Props {
 
 const GroupSettingsScreen: React.FC<Props> = ({
     groupId,
-    groupName = 'Pokhara Trip', groupEmoji = '🏔️', groupCurrency = 'NPR',
-    members = MOCK_MEMBERS, myUserId = 'u1',
+    groupName = '', groupEmoji = '👥', groupCurrency = 'NPR',
+    members: membersProp = [], myUserId = '',
     onBack, onSave, onInviteMember, onRemoveMember, onPromoteMember, onDeleteGroup,
 }) => {
     const [name, setName] = useState(groupName);
+    const [emoji, setEmoji] = useState(groupEmoji);
+    const [currency, setCurrency] = useState(groupCurrency);
+    const [members, setMembers] = useState<Member[]>(membersProp);
+    const [currentUserId, setCurrentUserId] = useState(myUserId);
+    const [loadingGroup, setLoadingGroup] = useState(!!groupId && !membersProp.length);
+
+    useEffect(() => {
+        if (!groupId || membersProp.length > 0) return;
+        setLoadingGroup(true);
+        apiService.getGroup(groupId)
+            .then(({ data }) => {
+                setName(data.name);
+                setEmoji(data.emoji);
+                setCurrency(data.currency);
+                setCurrentUserId(data.myUserId);
+                setMembers(data.members.map(m => ({ ...m, role: (m.id === data.myUserId ? 'admin' : 'member') as 'admin' | 'member' })));
+            })
+            .catch(() => {})
+            .finally(() => setLoadingGroup(false));
+    }, [groupId]);
 
     const handleDelete = () => {
         Alert.alert('Delete group', 'This will permanently remove the group and all its data. This cannot be undone.', [
@@ -78,6 +90,16 @@ const GroupSettingsScreen: React.FC<Props> = ({
         ]);
     };
 
+    if (loadingGroup) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: C.GRAY600, fontSize: 14 }}>Loading…</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={s.safe}>
             <StatusBar barStyle="light-content" backgroundColor={C.BLUE_DARK} />
@@ -88,7 +110,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
                         <Text style={s.headerTitle}>Group Settings</Text>
                         <TouchableOpacity onPress={() => onSave?.({ name: name.trim() })} activeOpacity={0.7} style={s.saveBtn}><Text style={s.saveBtnText}>Save</Text></TouchableOpacity>
                     </View>
-                    <View style={s.emojiWrap}><Text style={s.emojiBig}>{groupEmoji}</Text></View>
+                    <View style={s.emojiWrap}><Text style={s.emojiBig}>{emoji}</Text></View>
                 </LinearGradient>
 
                 <View style={s.sheet}>
@@ -97,7 +119,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
 
                     <View style={s.infoRow}>
                         <Text style={s.label}>CURRENCY</Text>
-                        <Text style={s.infoValue}>{groupCurrency}</Text>
+                        <Text style={s.infoValue}>{currency}</Text>
                     </View>
 
                     <View style={s.membersHeader}>
@@ -110,7 +132,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
 
                     <View style={s.memberList}>
                         {members.map((m, i) => {
-                            const isMe = m.id === myUserId;
+                            const isMe = m.id === currentUserId;
                             const isAdmin = m.role === 'admin';
                             return (
                                 <View key={m.id} style={[s.memberRow, i < members.length - 1 && s.memberRowBorder]}>

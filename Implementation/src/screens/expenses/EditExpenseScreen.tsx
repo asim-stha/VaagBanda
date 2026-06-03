@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
     KeyboardAvoidingView, Platform, StatusBar, Alert,
@@ -35,20 +35,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 interface Member { id: string; name: string; avatarColor: string; }
 
-const MOCK_MEMBERS: Member[] = [
-    { id: 'u1', name: 'Asim', avatarColor: C.CRIMSON },
-    { id: 'u2', name: 'Krishna', avatarColor: C.BLUE },
-    { id: 'u3', name: 'Riya', avatarColor: '#9C27B0' },
-    { id: 'u4', name: 'Bibek', avatarColor: '#FF6F00' },
-    { id: 'u5', name: 'Sita', avatarColor: '#00838F' },
-];
-
 interface Props {
     expenseId?: string;
-    initialAmount?: string;
-    initialDescription?: string;
-    initialCategory?: string;
-    initialParticipants?: string[];
     groupCurrency?: string;
     members?: Member[];
     myUserId?: string;
@@ -57,24 +45,51 @@ interface Props {
 }
 
 const EditExpenseScreen: React.FC<Props> = ({
-    expenseId = 'e1',
-    initialAmount = '8000',
-    initialDescription = 'Hotel — 2 nights',
-    initialCategory = 'other',
-    initialParticipants = ['u1', 'u2', 'u3', 'u4', 'u5'],
+    expenseId = '',
     groupCurrency = 'NPR',
-    members = MOCK_MEMBERS,
-    myUserId = 'u1',
+    members = [],
+    myUserId = '',
     onBack, onSave,
 }) => {
-    const [amount, setAmount] = useState(initialAmount);
-    const [description, setDescription] = useState(initialDescription);
-    const [category] = useState(initialCategory);
-    const [participants, setParticipants] = useState<string[]>(initialParticipants);
+    const [amount, setAmount] = useState('');
+    const [description, setDescription] = useState('');
+    const [category, setCategory] = useState('other');
+    const [participants, setParticipants] = useState<string[]>([]);
+    const [loadingExpense, setLoadingExpense] = useState(true);
+
+    useEffect(() => {
+        if (!expenseId) { setLoadingExpense(false); return; }
+        setLoadingExpense(true);
+        apiService.getExpense(expenseId)
+            .then(({ data }) => {
+                setAmount(String(data.amount));
+                setDescription(data.description);
+                setCategory(data.category);
+                setParticipants(data.splits.map(s => {
+                    const member = members.find(m => {
+                        const firstName = m.name.split(' ')[0];
+                        return firstName === s.name || s.name === 'You' && m.id === myUserId;
+                    });
+                    return member?.id || '';
+                }).filter(Boolean));
+            })
+            .catch(() => {})
+            .finally(() => setLoadingExpense(false));
+    }, [expenseId]);
 
     const amountNum = useMemo(() => { const p = parseFloat(amount.replace(/,/g, '')); return isNaN(p) ? 0 : p; }, [amount]);
     const perPerson = participants.length > 0 ? round2(amountNum / participants.length) : 0;
     const canSave = amountNum > 0 && description.trim().length > 0 && participants.length > 0;
+
+    if (loadingExpense) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: C.GRAY600, fontSize: 14 }}>Loading…</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     const toggleParticipant = (id: string) => {
         setParticipants(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);

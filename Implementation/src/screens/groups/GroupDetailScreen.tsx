@@ -120,28 +120,6 @@ interface GroupDetail {
   myUserId: string;
 }
 
-/* ─── MOCK DATA ────────────────────────────────────────────── */
-const MOCK_GROUP: GroupDetail = {
-  id: 'g1',
-  name: 'Pokhara Trip',
-  emoji: '🏔️',
-  currency: 'NPR',
-  myUserId: 'u1',
-  members: [
-    { id: 'u1', name: 'Asim',   avatarColor: COLORS.CRIMSON, balance:  2450 },
-    { id: 'u2', name: 'Krishna', avatarColor: COLORS.BLUE,    balance: -800  },
-    { id: 'u3', name: 'Riya',    avatarColor: '#9C27B0',      balance:  1200 },
-    { id: 'u4', name: 'Bibek',   avatarColor: '#FF6F00',      balance: -2100 },
-    { id: 'u5', name: 'Sita',    avatarColor: '#00838F',      balance: -750  },
-  ],
-  expenses: [
-    { id: 'e1', description: 'Hotel — 2 nights', amount: 8000, paidBy: 'u1', paidByName: 'You',     date: '2 hours ago', emoji: '🏨', myShare:  6400, participantCount: 5 },
-    { id: 'e2', description: 'Dinner at lakeside', amount: 2500, paidBy: 'u3', paidByName: 'Riya',   date: 'Yesterday',   emoji: '🍽️', myShare: -500,  participantCount: 5 },
-    { id: 'e3', description: 'Taxi from airport', amount: 1500, paidBy: 'u4', paidByName: 'Bibek',  date: '2 days ago',  emoji: '🚕', myShare: -300,  participantCount: 5 },
-    { id: 'e4', description: 'Paragliding tickets', amount: 6000, paidBy: 'u1', paidByName: 'You',     date: '3 days ago',  emoji: '🪂', myShare:  4800, participantCount: 5 },
-    { id: 'e5', description: 'Boat ride', amount: 800, paidBy: 'u2', paidByName: 'Krishna',          date: '3 days ago',  emoji: '⛵', myShare: -160,  participantCount: 5 },
-  ],
-};
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({
@@ -225,9 +203,9 @@ interface GroupDetailScreenProps {
   group?: GroupDetail;
   onBack?: () => void;
   onAddExpense?: (groupInfo: { groupId: string; groupName: string; groupCurrency: string; members: Member[]; myUserId: string }) => void;
-  onSettleUp?: () => void;
+  onSettleUp?: (info: { groupId: string; groupName: string; groupCurrency: string }) => void;
   onExpenseTap?: (expenseId: string) => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (info: { groupId: string; groupName: string; groupEmoji: string; groupCurrency: string; members: Member[]; myUserId: string }) => void;
 }
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
@@ -241,12 +219,12 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
   onOpenSettings,
 }) => {
   const [tab, setTab] = useState<'expenses' | 'balances'>('expenses');
-  const [group, setGroup] = useState<GroupDetail>(groupProp ?? MOCK_GROUP);
-  const [loading, setLoading] = useState(!!groupId);
+  const [group, setGroup] = useState<GroupDetail | null>(groupProp ?? null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!groupId) return;
+    if (!groupId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     apiService.getGroup(groupId)
@@ -266,7 +244,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
   }, [groupId]);
 
   const myMember = useMemo(
-    () => group.members.find(m => m.id === group.myUserId),
+    () => group?.members.find(m => m.id === group?.myUserId),
     [group]
   );
   const myBalance = myMember?.balance ?? 0;
@@ -286,6 +264,19 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
       <SafeAreaView style={styles.safeArea}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <Text style={{ color: COLORS.CRIMSON, fontSize: 14, textAlign: 'center' }}>{error}</Text>
+          <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
+            <Text style={{ color: COLORS.BLUE, fontWeight: '700' }}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!group) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: COLORS.GRAY600, fontSize: 14, textAlign: 'center' }}>No group selected</Text>
           <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
             <Text style={{ color: COLORS.BLUE, fontWeight: '700' }}>Go back</Text>
           </TouchableOpacity>
@@ -324,7 +315,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
               <Icon name="back" size={18} color={COLORS.WHITE} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={onOpenSettings}
+              onPress={() => onOpenSettings?.({ groupId: group.id, groupName: group.name, groupEmoji: group.emoji, groupCurrency: group.currency, members: group.members, myUserId: group.myUserId })}
               activeOpacity={0.7}
               style={styles.iconBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -362,7 +353,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
               </Text>
             </View>
             <TouchableOpacity
-              onPress={onSettleUp}
+              onPress={() => onSettleUp?.({ groupId: group.id, groupName: group.name, groupCurrency: group.currency })}
               activeOpacity={0.85}
               style={styles.settleBtn}
             >
@@ -446,7 +437,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
             {/* Big settle button at the bottom of balances tab */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={onSettleUp}
+              onPress={() => onSettleUp?.({ groupId: group.id, groupName: group.name, groupCurrency: group.currency })}
               style={{ marginTop: 18 }}
             >
               <LinearGradient

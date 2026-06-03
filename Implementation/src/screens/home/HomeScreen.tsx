@@ -131,8 +131,12 @@ interface User {
   avatarColor: string;
 }
 
-/* ─── MOCK DATA ─── */
-const ME: User = { id: 'u1', name: 'Asim', avatarColor: COLORS.CRIMSON };
+function avatarColorForId(id: string): string {
+  const palette = ['#DC143C', '#1A2B5F', '#9C27B0', '#FF6F00', '#00838F', '#2E7D32'];
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return palette[Math.abs(h) % palette.length];
+}
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({ user, size = 42 }: { user: User; size?: number }) => (
@@ -148,7 +152,6 @@ const Avatar = ({ user, size = 42 }: { user: User; size?: number }) => (
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface HomeScreenProps {
-  user?: User;
   onGroupTap?: (groupId: string) => void;
   onAddExpense?: () => void;
   onScanReceipt?: () => void;
@@ -257,7 +260,6 @@ const TabBar = ({
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
 const HomeScreen: React.FC<HomeScreenProps> = ({
-  user = ME,
   onGroupTap,
   onAddExpense,
   onScanReceipt,
@@ -281,13 +283,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [refreshKey]);
 
   const displayUser = useMemo(() => {
+    const id = authUser?.id || '';
     return {
-      id: authUser?.id || user.id,
-      name: authUser?.name || authUser?.email?.split('@')[0] || user.name,
+      id,
+      name: authUser?.name || authUser?.email?.split('@')[0] || 'User',
       email: authUser?.email || '',
-      avatarColor: user.avatarColor,
+      avatarColor: avatarColorForId(id),
     };
-  }, [authUser, user]);
+  }, [authUser]);
 
   // Compute overall balance (sum across all groups)
   // Note: in production, you'd convert each group to a common currency first.

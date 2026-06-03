@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
+import { apiService } from '../../services/apiService';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
 const COLORS = {
@@ -122,12 +123,6 @@ interface Creditor extends Member {
 
 type PaymentMethod = 'cash' | 'bank' | 'other';
 
-/* ─── MOCK DATA ────────────────────────────────────────────── */
-const MOCK_CREDITORS: Creditor[] = [
-  { id: 'u2', name: 'Krishna', avatarColor: COLORS.BLUE,    amountOwed: 800  },
-  { id: 'u4', name: 'Bibek',   avatarColor: '#FF6F00',      amountOwed: 2100 },
-  { id: 'u5', name: 'Sita',    avatarColor: '#00838F',      amountOwed: 750  },
-];
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({
@@ -145,9 +140,9 @@ const Avatar = ({
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface SettleUpScreenProps {
+  groupId?: string;
   groupName?: string;
   groupCurrency?: string;
-  creditors?: Creditor[];
   onBack?: () => void;
   onSettle?: (settlement: {
     payeeId: string;
@@ -159,14 +154,26 @@ interface SettleUpScreenProps {
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
 const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
-  groupName = 'Pokhara Trip',
+  groupId = '',
+  groupName = '',
   groupCurrency = 'NPR',
-  creditors = MOCK_CREDITORS,
   onBack,
   onSettle,
 }) => {
   type Step = 'pick' | 'form' | 'done';
   const [step, setStep] = useState<Step>('pick');
+  const [creditors, setCreditors] = useState<Creditor[]>([]);
+  const [loadingCreditors, setLoadingCreditors] = useState(true);
+  const [creditorError, setCreditorError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!groupId) { setLoadingCreditors(false); return; }
+    setLoadingCreditors(true);
+    apiService.getCreditors(groupId)
+      .then(({ data }) => setCreditors(data))
+      .catch(err => setCreditorError(err.message || 'Failed to load'))
+      .finally(() => setLoadingCreditors(false));
+  }, [groupId]);
   const [selected, setSelected] = useState<Creditor | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('cash');
@@ -278,7 +285,15 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
               ═══════════════════════════════════════════════════ */}
           {step === 'pick' && (
             <View style={styles.sheet}>
-              {creditors.length === 0 ? (
+              {loadingCreditors ? (
+                <View style={styles.emptyState}>
+                  <Text style={{ color: COLORS.GRAY600, fontSize: 14 }}>Loading…</Text>
+                </View>
+              ) : creditorError ? (
+                <View style={styles.emptyState}>
+                  <Text style={{ color: COLORS.CRIMSON, fontSize: 13, textAlign: 'center' }}>{creditorError}</Text>
+                </View>
+              ) : creditors.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyEmoji}>🎉</Text>
                   <Text style={styles.emptyTitle}>You're all squared up</Text>

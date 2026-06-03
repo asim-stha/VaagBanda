@@ -131,16 +131,6 @@ const CATEGORIES: CategoryOption[] = [
   { key: 'other',     emoji: '📦', label: 'Other' },
 ];
 
-/* ─── MOCK DATA ────────────────────────────────────────────── */
-const MOCK_MEMBERS: Member[] = [
-  { id: 'u1', name: 'Asim',    avatarColor: COLORS.CRIMSON },
-  { id: 'u2', name: 'Krishna', avatarColor: COLORS.BLUE    },
-  { id: 'u3', name: 'Riya',    avatarColor: '#9C27B0'      },
-  { id: 'u4', name: 'Bibek',   avatarColor: '#FF6F00'      },
-  { id: 'u5', name: 'Sita',    avatarColor: '#00838F'      },
-];
-
-const MY_USER_ID = 'u1';
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({
@@ -176,10 +166,10 @@ interface AddExpenseScreenProps {
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
 const AddExpenseScreen: React.FC<AddExpenseScreenProps> = ({
-  groupName = 'Pokhara Trip',
+  groupName = '',
   groupCurrency = 'NPR',
-  members = MOCK_MEMBERS,
-  myUserId = MY_USER_ID,
+  members = [],
+  myUserId = '',
   onBack,
   onSave,
 }) => {

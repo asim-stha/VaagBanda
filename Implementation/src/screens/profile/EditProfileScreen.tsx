@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
     KeyboardAvoidingView, Platform, StatusBar,
@@ -31,16 +32,19 @@ interface Props {
 }
 
 const EditProfileScreen: React.FC<Props> = ({
-    initialName = 'Asim', initialEmail = 'asim@cybersquadnp.com', avatarColor = C.CRIMSON,
+    initialName, initialEmail, avatarColor = C.CRIMSON,
     onBack, onSave,
 }) => {
-    const [name, setName] = useState(initialName);
-    const [email, setEmail] = useState(initialEmail);
+    const { user: authUser } = useAuth();
+    const resolvedName = initialName ?? authUser?.name ?? authUser?.email?.split('@')[0] ?? '';
+    const resolvedEmail = initialEmail ?? authUser?.email ?? '';
+    const [name, setName] = useState(resolvedName);
+    const [email, setEmail] = useState(resolvedEmail);
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
     const [saved, setSaved] = useState(false);
 
-    const hasChanges = name !== initialName || email !== initialEmail || newPw.length > 0;
+    const hasChanges = name !== resolvedName || email !== resolvedEmail || newPw.length > 0;
     const canSave = hasChanges && name.trim().length > 0 && email.includes('@');
 
     const handleSave = () => {

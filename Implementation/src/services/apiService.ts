@@ -119,6 +119,51 @@ async function getCurrentUserId(): Promise<string> {
   return user.id;
 }
 
+// ─── Extended Types ───────────────────────────────────────────────────────────
+
+export interface ExpenseDetail {
+  id: string;
+  description: string;
+  emoji: string;
+  amount: number;
+  currency: string;
+  paidByName: string;
+  paidByColor: string;
+  date: string;
+  category: string;
+  groupName: string;
+  note: string;
+  splits: Array<{ name: string; avatarColor: string; amount: number; isPayer: boolean }>;
+}
+
+export interface ActivityItem {
+  id: string;
+  icon: string;
+  text: string;
+  time: string;
+}
+
+export interface ProfileStats {
+  groupCount: number;
+  expenseCount: number;
+  netBalance: number;
+}
+
+export interface MemberTransaction {
+  id: string;
+  type: 'expense' | 'settlement';
+  description: string;
+  amount: number;
+  date: string;
+  emoji: string;
+}
+
+export interface AnalyticsData {
+  categories: Array<{ emoji: string; label: string; amount: number; color: string }>;
+  monthly: Array<{ month: string; amount: number }>;
+  currency: string;
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 export const apiService = {
@@ -434,5 +479,287 @@ export const apiService = {
     }));
     const { error: iErr } = await supabase.from('expense_splits').insert(splits);
     if (iErr) throw new Error(iErr.message);
+  },
+
+  async getExpense(expenseId: string): Promise<{ data: ExpenseDetail }> {
+    const userId = await getCurrentUserId();
+
+    const { data: exp, error } = await supabase
+      .from('expenses')
+      .select(`
+        expense_id, title, category, amount, created_at, paid_by, group_id,
+        expense_splits(user_id, amount_owed),
+        groups(group_name, default_currency)
+      `)
+      .eq('expense_id', expenseId)
+      .single();
+    if (error || !exp) throw new Error(error?.message || 'Expense not found');
+
+    const groupData = exp.groups as unknown as { group_name: string; default_currency: string } | null;
+    const splits: Array<{ user_id: string; amount_owed: number }> = exp.expense_splits || [];
+    const userIds = Array.from(new Set([exp.paid_by, ...splits.map((s: any) => s.user_id)]));
+
+    const { data: profileRows } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, avatar_color')
+      .in('user_id', userIds);
+
+    const profileMap = new Map(
+      (profileRows || []).map((p: any) => [
+        p.user_id,
+        { name: p.full_name || 'Unknown', color: p.avatar_color || avatarColorFromId(p.user_id) },
+      ])
+    );
+
+    const payerProfile = profileMap.get(exp.paid_by) ?? {
+      name: 'Unknown', color: avatarColorFromId(exp.paid_by),
+    };
+    const formattedDate = new Date(exp.created_at).toLocaleString('en-US', {
+      month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+
+    return {
+      data: {
+        id: exp.expense_id,
+        description: exp.title,
+        emoji: categoryEmoji[exp.category] || categoryEmoji.other,
+        amount: Number(exp.amount),
+        currency: groupData?.default_currency || 'NPR',
+        paidByName: exp.paid_by === userId ? 'You' : payerProfile.name,
+        paidByColor: payerProfile.color,
+        date: formattedDate,
+        category: exp.category,
+        groupName: groupData?.group_name || '',
+        note: '',
+        splits: splits.map((s: any) => {
+          const profile = profileMap.get(s.user_id) ?? {
+            name: 'Unknown', color: avatarColorFromId(s.user_id),
+          };
+          return {
+            name: s.user_id === userId ? 'You' : profile.name,
+            avatarColor: profile.color,
+            amount: Number(s.amount_owed),
+            isPayer: s.user_id === exp.paid_by,
+          };
+        }),
+      },
+    };
+  },
+
+  async getActivity(): Promise<{ data: ActivityItem[] }> {
+    const userId = await getCurrentUserId();
+
+    const { data: memberRows } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', userId);
+    if (!memberRows?.length) return { data: [] };
+
+    const groupIds = memberRows.map((r: any) => r.group_id);
+
+    const [expResult, setResult] = await Promise.all([
+      supabase
+        .from('expenses')
+        .select('expense_id, title, amount, paid_by, created_at, group_id, category, groups(group_name)')
+        .in('group_id', groupIds)
+        .order('created_at', { ascending: false })
+        .limit(15),
+      supabase
+        .from('settlements')
+        .select('settlement_id, amount, payer_id, payee_id, created_at, group_id, groups(group_name)')
+        .in('group_id', groupIds)
+        .order('created_at', { ascending: false })
+        .limit(10),
+    ]);
+
+    const expenses = expResult.data || [];
+    const settlements = setResult.data || [];
+
+    const userIds = Array.from(new Set([
+      ...expenses.map((e: any) => e.paid_by),
+      ...settlements.flatMap((s: any) => [s.payer_id, s.payee_id]),
+    ]));
+
+    const profileRows = userIds.length
+      ? (await supabase.from('profiles').select('user_id, full_name').in('user_id', userIds)).data || []
+      : [];
+
+    const nameOf = (id: string) =>
+      id === userId ? 'You' : ((profileRows as any[]).find(p => p.user_id === id)?.full_name || 'Someone');
+
+    type Raw = { ts: string; item: ActivityItem };
+    const raw: Raw[] = [
+      ...expenses.map((e: any): Raw => ({
+        ts: e.created_at,
+        item: {
+          id: `exp-${e.expense_id}`,
+          icon: categoryEmoji[e.category] || '💰',
+          text: `${nameOf(e.paid_by)} added "${e.title}" to ${(e.groups as any)?.group_name || 'a group'}`,
+          time: formatRelativeDate(e.created_at),
+        },
+      })),
+      ...settlements.map((s: any): Raw => ({
+        ts: s.created_at,
+        item: {
+          id: `set-${s.settlement_id}`,
+          icon: '✅',
+          text: `${nameOf(s.payer_id)} settled with ${nameOf(s.payee_id)} in ${(s.groups as any)?.group_name || 'a group'}`,
+          time: formatRelativeDate(s.created_at),
+        },
+      })),
+    ];
+
+    raw.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+    return { data: raw.map(r => r.item) };
+  },
+
+  async getProfileStats(): Promise<{ data: ProfileStats }> {
+    const userId = await getCurrentUserId();
+
+    const { data: memberRows } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', userId);
+
+    const groupIds = (memberRows || []).map((r: any) => r.group_id);
+    if (!groupIds.length) return { data: { groupCount: 0, expenseCount: 0, netBalance: 0 } };
+
+    const { data: groups } = await supabase
+      .from('groups')
+      .select('group_id, expenses(expense_id, paid_by, amount, expense_splits(user_id, amount_owed)), settlements(payer_id, payee_id, amount)')
+      .in('group_id', groupIds);
+
+    let netBalance = 0;
+    let expenseCount = 0;
+
+    for (const g of (groups || [])) {
+      const exps: DbExpense[] = (g.expenses || []).map((e: any) => ({
+        ...e, expense_splits: e.expense_splits || [],
+      }));
+      const setts: DbSettlement[] = (g.settlements || []).map((s: any) => ({ ...s, created_at: s.created_at || '' }));
+      netBalance += computeBalance(exps, setts, userId);
+      expenseCount += exps.filter((e: any) =>
+        e.paid_by === userId || e.expense_splits.some((s: any) => s.user_id === userId)
+      ).length;
+    }
+
+    return { data: { groupCount: groupIds.length, expenseCount, netBalance: round2(netBalance) } };
+  },
+
+  async getMemberHistory(groupId: string, memberId: string): Promise<{ data: MemberTransaction[] }> {
+    const userId = await getCurrentUserId();
+
+    const { data: g, error } = await supabase
+      .from('groups')
+      .select('default_currency, expenses(expense_id, paid_by, title, category, amount, created_at, expense_splits(user_id, amount_owed)), settlements(settlement_id, payer_id, payee_id, amount, created_at)')
+      .eq('group_id', groupId)
+      .single();
+    if (error || !g) throw new Error(error?.message || 'Group not found');
+
+    type RawTx = { ts: string; tx: MemberTransaction };
+    const raw: RawTx[] = [];
+
+    for (const e of (g.expenses || [])) {
+      const splits: Array<{ user_id: string; amount_owed: number }> = e.expense_splits || [];
+      const userIn = splits.some(s => s.user_id === userId);
+      const memberIn = splits.some(s => s.user_id === memberId);
+      if (!userIn || !memberIn) continue;
+
+      const mySplit = splits.find(s => s.user_id === userId);
+      const amount = e.paid_by === userId
+        ? round2(Number(e.amount) - Number(mySplit?.amount_owed || 0))
+        : round2(-Number(mySplit?.amount_owed || 0));
+
+      raw.push({
+        ts: e.created_at,
+        tx: {
+          id: e.expense_id,
+          type: 'expense',
+          description: e.title,
+          amount,
+          date: new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          emoji: categoryEmoji[e.category] || categoryEmoji.other,
+        },
+      });
+    }
+
+    for (const s of (g.settlements || [])) {
+      const relevant =
+        (s.payer_id === userId && s.payee_id === memberId) ||
+        (s.payer_id === memberId && s.payee_id === userId);
+      if (!relevant) continue;
+
+      raw.push({
+        ts: s.created_at,
+        tx: {
+          id: s.settlement_id,
+          type: 'settlement',
+          description: 'Settlement',
+          amount: s.payer_id === userId ? Number(s.amount) : -Number(s.amount),
+          date: new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          emoji: '💵',
+        },
+      });
+    }
+
+    raw.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+    return { data: raw.map(r => r.tx) };
+  },
+
+  async getAnalytics(groupId: string): Promise<{ data: AnalyticsData }> {
+    const userId = await getCurrentUserId();
+
+    const { data: g, error } = await supabase
+      .from('groups')
+      .select('default_currency, expenses(expense_id, category, amount, created_at, expense_splits(user_id, amount_owed))')
+      .eq('group_id', groupId)
+      .single();
+    if (error || !g) throw new Error(error?.message || 'Group not found');
+
+    const catColors: Record<string, string> = {
+      food: '#FF6F00', transport: '#1A2B5F', hotel: '#DC143C',
+      tickets: '#9C27B0', shopping: '#00838F', fuel: '#E65100', utility: '#455A64', other: '#5A6478',
+    };
+    const catLabels: Record<string, string> = {
+      food: 'Food', transport: 'Transport', hotel: 'Stay', tickets: 'Tickets',
+      shopping: 'Shopping', fuel: 'Fuel', utility: 'Utility', other: 'Other',
+    };
+
+    const catTotals: Record<string, number> = {};
+    const monthTotals: Record<string, number> = {};
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthTotals[d.toLocaleDateString('en-US', { month: 'short' })] = 0;
+    }
+
+    for (const exp of (g.expenses || [])) {
+      const split = (exp.expense_splits || []).find((s: any) => s.user_id === userId);
+      const myAmt = split ? Number(split.amount_owed) : 0;
+      if (myAmt <= 0) continue;
+
+      catTotals[exp.category] = round2((catTotals[exp.category] || 0) + myAmt);
+
+      const d = new Date(exp.created_at);
+      const monthsAgo = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth();
+      if (monthsAgo >= 0 && monthsAgo < 6) {
+        const key = d.toLocaleDateString('en-US', { month: 'short' });
+        monthTotals[key] = round2((monthTotals[key] || 0) + myAmt);
+      }
+    }
+
+    const categories = Object.entries(catTotals)
+      .filter(([, v]) => v > 0)
+      .map(([key, amount]) => ({
+        emoji: categoryEmoji[key] || '📦',
+        label: catLabels[key] || key,
+        amount,
+        color: catColors[key] || '#5A6478',
+      }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const monthly = Object.entries(monthTotals).map(([month, amount]) => ({ month, amount }));
+
+    return { data: { categories, monthly, currency: g.default_currency } };
   },
 };

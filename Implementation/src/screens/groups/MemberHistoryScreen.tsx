@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService, MemberTransaction } from '../../services/apiService';
 import Svg, { Line, Polyline } from 'react-native-svg';
 
 const C = { CRIMSON: '#DC143C', CRIMSON_DARK: '#A01030', BLUE: '#1A2B5F', BLUE_DARK: '#0F1F4A', WHITE: '#FFFFFF', GHOST: '#F7F8FB', GRAY100: '#EEF1F6', GRAY200: '#E1E5EE', GRAY400: '#9AA3B5', GRAY600: '#5A6478', GRAY800: '#1F2A44', SUCCESS: '#27AE60' };
@@ -21,26 +22,29 @@ const Avatar = ({ name, color, size = 36 }: { name: string; color: string; size?
 
 const fmt = (n: number) => Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-interface Transaction { id: string; type: 'expense' | 'settlement'; description: string; amount: number; date: string; emoji: string; }
-
-const MOCK: Transaction[] = [
-    { id: 't1', type: 'expense', description: 'Hotel — 2 nights', amount: -1600, date: 'May 25', emoji: '🏨' },
-    { id: 't2', type: 'expense', description: 'Paragliding tickets', amount: -1200, date: 'May 23', emoji: '🪂' },
-    { id: 't3', type: 'settlement', description: 'Cash payment', amount: 500, date: 'May 22', emoji: '💵' },
-    { id: 't4', type: 'expense', description: 'Groceries', amount: -350, date: 'May 20', emoji: '🛒' },
-    { id: 't5', type: 'settlement', description: 'Bank transfer', amount: 1000, date: 'May 18', emoji: '🏛️' },
-    { id: 't6', type: 'expense', description: 'Uber ride', amount: -200, date: 'May 15', emoji: '🚕' },
-];
-
 interface Props {
-    memberName?: string; memberColor?: string; currency?: string; netBalance?: number;
-    transactions?: Transaction[]; onBack?: () => void;
+    groupId?: string; memberId?: string;
+    memberName?: string; memberColor?: string; currency?: string;
+    onBack?: () => void;
 }
 
 const MemberHistoryScreen: React.FC<Props> = ({
-    memberName = 'Krishna', memberColor = C.BLUE, currency = 'NPR', netBalance = -800,
-    transactions = MOCK, onBack,
+    groupId = '', memberId = '',
+    memberName = '', memberColor = C.BLUE, currency = 'NPR',
+    onBack,
 }) => {
+    const [transactions, setTransactions] = useState<MemberTransaction[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!groupId || !memberId) { setLoading(false); return; }
+        apiService.getMemberHistory(groupId, memberId)
+            .then(({ data }) => setTransactions(data))
+            .catch(() => setTransactions([]))
+            .finally(() => setLoading(false));
+    }, [groupId, memberId]);
+
+    const netBalance = transactions.reduce((acc, t) => acc + t.amount, 0);
     const isOwed = netBalance > 0;
     const owes = netBalance < 0;
     const balColor = isOwed ? C.SUCCESS : owes ? C.CRIMSON : C.GRAY600;
@@ -68,7 +72,11 @@ const MemberHistoryScreen: React.FC<Props> = ({
 
                 <View style={s.sheet}>
                     <Text style={s.sectionLabel}>ALL TRANSACTIONS</Text>
-                    {transactions.map((t, i) => {
+                    {loading ? (
+                        <Text style={{ color: C.GRAY600, fontSize: 13, textAlign: 'center', marginTop: 20 }}>Loading…</Text>
+                    ) : transactions.length === 0 ? (
+                        <Text style={{ color: C.GRAY600, fontSize: 13, textAlign: 'center', marginTop: 20 }}>No transactions yet</Text>
+                    ) : transactions.map((t, i) => {
                         const isPositive = t.amount > 0;
                         return (
                             <View key={t.id} style={[s.txRow, i < transactions.length - 1 && s.txRowBorder]}>

@@ -9,7 +9,7 @@
  *   npx expo install expo-linear-gradient react-native-svg
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -19,6 +19,7 @@ import {
     Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiService } from '../../services/apiService';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
@@ -93,12 +94,6 @@ interface SettingsItem {
     onPress?: () => void;
 }
 
-/* ─── MOCK DATA ────────────────────────────────────────────── */
-const ME: UserInfo = {
-    name: 'Asim',
-    email: 'asim@cybersquadnp.com',
-    avatarColor: COLORS.CRIMSON,
-};
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface ProfileScreenProps {
@@ -131,7 +126,7 @@ const SettingsRow = ({
 
 /* ─── MAIN COMPONENT ───────────────────────────────────────── */
 const ProfileScreen: React.FC<ProfileScreenProps> = ({
-    user = ME,
+    user,
     onEditProfile,
     onNotificationPrefs,
     onDefaultCurrency,
@@ -139,6 +134,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onAbout,
     onLogout,
 }) => {
+    const [stats, setStats] = useState({ groupCount: 0, expenseCount: 0, netBalance: 0 });
+
+    useEffect(() => {
+        apiService.getProfileStats()
+            .then(({ data }) => setStats(data))
+            .catch(() => {});
+    }, []);
     const settingsItems: (SettingsItem & { isLast?: boolean })[] = [
         { icon: '👤', label: 'Edit Profile', onPress: onEditProfile },
         { icon: '🔔', label: 'Notification Preferences', onPress: onNotificationPrefs },
@@ -163,9 +165,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {/* Decorative blob */}
                     <View style={styles.blob} />
 
-                    <Avatar name={user.name} color={user.avatarColor} size={72} />
-                    <Text style={styles.headerName}>{user.name}</Text>
-                    <Text style={styles.headerEmail}>{user.email}</Text>
+                    <Avatar name={user?.name || 'User'} color={user?.avatarColor || COLORS.CRIMSON} size={72} />
+                    <Text style={styles.headerName}>{user?.name || 'User'}</Text>
+                    <Text style={styles.headerEmail}>{user?.email || ''}</Text>
 
                     {/* Edit profile pill */}
                     <TouchableOpacity
@@ -180,17 +182,19 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 {/* Stats row */}
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>4</Text>
+                        <Text style={styles.statNumber}>{stats.groupCount}</Text>
                         <Text style={styles.statLabel}>Groups</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>18</Text>
+                        <Text style={styles.statNumber}>{stats.expenseCount}</Text>
                         <Text style={styles.statLabel}>Expenses</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={[styles.statNumber, { color: '#27AE60' }]}>+2,080</Text>
+                        <Text style={[styles.statNumber, { color: stats.netBalance >= 0 ? '#27AE60' : '#DC143C' }]}>
+                            {stats.netBalance >= 0 ? '+' : ''}{stats.netBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                        </Text>
                         <Text style={styles.statLabel}>Net balance</Text>
                     </View>
                 </View>

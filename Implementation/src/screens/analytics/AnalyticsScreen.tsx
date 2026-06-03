@@ -5,12 +5,13 @@
  * Uses simple bar chart rendered with Views (no chart library needed).
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line, Polyline } from 'react-native-svg';
+import { apiService, AnalyticsData } from '../../services/apiService';
 
 const C = { CRIMSON: '#DC143C', CRIMSON_DARK: '#A01030', BLUE: '#1A2B5F', BLUE_DARK: '#0F1F4A', BLUE_MID: '#2B3F75', WHITE: '#FFFFFF', GHOST: '#F7F8FB', GRAY100: '#EEF1F6', GRAY200: '#E1E5EE', GRAY400: '#9AA3B5', GRAY600: '#5A6478', GRAY800: '#1F2A44', SUCCESS: '#27AE60' };
 
@@ -22,34 +23,27 @@ const Icon = ({ name, size = 18, color = C.GRAY400 }: { name: string; size?: num
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
-interface CategorySpend { emoji: string; label: string; amount: number; color: string; }
-interface MonthSpend { month: string; amount: number; }
+interface Props { groupId?: string; groupName?: string; onBack?: () => void; onExport?: () => void; }
 
-const CATEGORIES: CategorySpend[] = [
-    { emoji: '🏨', label: 'Stay', amount: 8000, color: C.CRIMSON },
-    { emoji: '🍽️', label: 'Food', amount: 4200, color: '#FF6F00' },
-    { emoji: '🚕', label: 'Transport', amount: 2800, color: C.BLUE },
-    { emoji: '🎟️', label: 'Tickets', amount: 6000, color: '#9C27B0' },
-    { emoji: '🛍️', label: 'Shopping', amount: 1200, color: '#00838F' },
-    { emoji: '📦', label: 'Other', amount: 600, color: C.GRAY600 },
-];
-
-const MONTHLY: MonthSpend[] = [
-    { month: 'Jan', amount: 3200 },
-    { month: 'Feb', amount: 4800 },
-    { month: 'Mar', amount: 2100 },
-    { month: 'Apr', amount: 6500 },
-    { month: 'May', amount: 8400 },
-];
-
-const maxCat = Math.max(...CATEGORIES.map(c => c.amount));
-const maxMonth = Math.max(...MONTHLY.map(m => m.amount));
-const totalSpent = CATEGORIES.reduce((a, c) => a + c.amount, 0);
-
-interface Props { groupName?: string; currency?: string; onBack?: () => void; onExport?: () => void; }
-
-const AnalyticsScreen: React.FC<Props> = ({ groupName = 'Pokhara Trip', currency = 'NPR', onBack, onExport }) => {
+const AnalyticsScreen: React.FC<Props> = ({ groupId = '', groupName = '', onBack, onExport }) => {
     const [period, setPeriod] = useState<'month' | 'all'>('all');
+    const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({ categories: [], monthly: [], currency: 'NPR' });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!groupId) { setLoading(false); return; }
+        apiService.getAnalytics(groupId)
+            .then(({ data }) => setAnalyticsData(data))
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, [groupId]);
+
+    const categories = analyticsData.categories;
+    const monthly = analyticsData.monthly;
+    const currency = analyticsData.currency;
+    const maxCat = Math.max(...categories.map(c => c.amount), 1);
+    const maxMonth = Math.max(...monthly.map(m => m.amount), 1);
+    const totalSpent = categories.reduce((a, c) => a + c.amount, 0);
 
     return (
         <SafeAreaView style={s.safe}>
@@ -67,51 +61,59 @@ const AnalyticsScreen: React.FC<Props> = ({ groupName = 'Pokhara Trip', currency
                     <View style={s.totalCard}>
                         <Text style={s.totalLabel}>TOTAL SPENT</Text>
                         <Text style={s.totalAmount}>{fmt(totalSpent)} <Text style={s.totalCurrency}>{currency}</Text></Text>
-                        <Text style={s.totalSub}>{CATEGORIES.length} categories · {MONTHLY.length} months</Text>
+                        <Text style={s.totalSub}>{categories.length} categories · {monthly.length} months</Text>
                     </View>
                 </LinearGradient>
 
                 <View style={s.sheet}>
-                    {/* Category breakdown */}
-                    <Text style={s.sectionLabel}>BY CATEGORY</Text>
-                    <View style={s.card}>
-                        {CATEGORIES.map((c, i) => {
-                            const pct = (c.amount / maxCat) * 100;
-                            return (
-                                <View key={c.label} style={[s.catRow, i < CATEGORIES.length - 1 && s.catRowBorder]}>
-                                    <Text style={s.catEmoji}>{c.emoji}</Text>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={s.catHeader}>
-                                            <Text style={s.catLabel}>{c.label}</Text>
-                                            <Text style={s.catAmount}>{fmt(c.amount)} {currency}</Text>
+                    {loading ? (
+                        <Text style={{ color: C.GRAY600, fontSize: 13, textAlign: 'center', marginTop: 20 }}>Loading analytics…</Text>
+                    ) : (
+                        <>
+                            {/* Category breakdown */}
+                            <Text style={s.sectionLabel}>BY CATEGORY</Text>
+                            <View style={s.card}>
+                                {categories.length === 0 ? (
+                                    <Text style={{ color: C.GRAY600, fontSize: 13, textAlign: 'center', padding: 20 }}>No spending data yet</Text>
+                                ) : categories.map((c, i) => {
+                                    const pct = (c.amount / maxCat) * 100;
+                                    return (
+                                        <View key={c.label} style={[s.catRow, i < categories.length - 1 && s.catRowBorder]}>
+                                            <Text style={s.catEmoji}>{c.emoji}</Text>
+                                            <View style={{ flex: 1 }}>
+                                                <View style={s.catHeader}>
+                                                    <Text style={s.catLabel}>{c.label}</Text>
+                                                    <Text style={s.catAmount}>{fmt(c.amount)} {currency}</Text>
+                                                </View>
+                                                <View style={s.barTrack}>
+                                                    <View style={[s.barFill, { width: `${pct}%`, backgroundColor: c.color }]} />
+                                                </View>
+                                            </View>
                                         </View>
-                                        <View style={s.barTrack}>
-                                            <View style={[s.barFill, { width: `${pct}%`, backgroundColor: c.color }]} />
-                                        </View>
-                                    </View>
-                                </View>
-                            );
-                        })}
-                    </View>
+                                    );
+                                })}
+                            </View>
 
-                    {/* Monthly trend */}
-                    <Text style={[s.sectionLabel, { marginTop: 24 }]}>MONTHLY TREND</Text>
-                    <View style={s.card}>
-                        <View style={s.barChart}>
-                            {MONTHLY.map(m => {
-                                const pct = (m.amount / maxMonth) * 100;
-                                return (
-                                    <View key={m.month} style={s.barCol}>
-                                        <Text style={s.barAmount}>{(m.amount / 1000).toFixed(1)}k</Text>
-                                        <View style={s.barOuter}>
-                                            <LinearGradient colors={[C.CRIMSON, C.CRIMSON_DARK]} style={[s.barInner, { height: `${pct}%` }]} />
-                                        </View>
-                                        <Text style={s.barLabel}>{m.month}</Text>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    </View>
+                            {/* Monthly trend */}
+                            <Text style={[s.sectionLabel, { marginTop: 24 }]}>MONTHLY TREND</Text>
+                            <View style={s.card}>
+                                <View style={s.barChart}>
+                                    {monthly.map(m => {
+                                        const pct = (m.amount / maxMonth) * 100;
+                                        return (
+                                            <View key={m.month} style={s.barCol}>
+                                                <Text style={s.barAmount}>{(m.amount / 1000).toFixed(1)}k</Text>
+                                                <View style={s.barOuter}>
+                                                    <LinearGradient colors={[C.CRIMSON, C.CRIMSON_DARK]} style={[s.barInner, { height: `${pct}%` }]} />
+                                                </View>
+                                                <Text style={s.barLabel}>{m.month}</Text>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        </>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>

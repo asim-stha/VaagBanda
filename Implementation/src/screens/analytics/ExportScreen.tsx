@@ -21,7 +21,7 @@ type Scope = 'all' | 'month' | 'custom';
 
 interface Props { groupName?: string; onBack?: () => void; onExport?: (format: Format, scope: Scope) => void; }
 
-const ExportScreen: React.FC<Props> = ({ groupName = 'Pokhara Trip', onBack, onExport }) => {
+const ExportScreen: React.FC<Props> = ({ groupName = '', onBack, onExport }) => {
     const [format, setFormat] = useState<Format>('pdf');
     const [scope, setScope] = useState<Scope>('all');
     const [exporting, setExporting] = useState(false);

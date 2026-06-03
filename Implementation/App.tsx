@@ -16,6 +16,7 @@ import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
 import HomeScreen from './src/screens/home/HomeScreen';
 import GroupDetailScreen from './src/screens/groups/GroupDetailScreen';
 import CreateGroupScreen from './src/screens/groups/CreateGroupScreen';
+import SelectGroupScreen from './src/screens/groups/SelectGroupScreen';
 import GroupSettingsScreen from './src/screens/groups/GroupSettingsScreen';
 import MemberHistoryScreen from './src/screens/groups/MemberHistoryScreen';
 
@@ -52,6 +53,7 @@ type Screen =
   | 'group'
   | 'group-settings'
   | 'member-history'
+  | 'select-group'
   | 'add-expense'
   | 'expense-detail'
   | 'edit-expense'
@@ -67,6 +69,7 @@ type Tab = 'home' | 'groups' | 'activity' | 'profile';
 interface GroupContext {
   groupId: string;
   groupName: string;
+  groupEmoji?: string;
   groupCurrency: string;
   members: Array<{ id: string; name: string; avatarColor: string; balance: number }>;
   myUserId: string;
@@ -79,8 +82,12 @@ function AppNavigator() {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
+  const [activeMemberName, setActiveMemberName] = useState<string>('');
+  const [activeMemberColor, setActiveMemberColor] = useState<string>('#1A2B5F');
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string>('');
   const [groupContext, setGroupContext] = useState<GroupContext | null>(null);
+  const [addExpenseSource, setAddExpenseSource] = useState<'group' | 'select-group'>('group');
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Once Supabase finishes loading the session, go to the right screen
@@ -150,6 +157,19 @@ function AppNavigator() {
 
   /* ─── EXPENSE SCREENS ─── */
 
+  if (screen === 'select-group') {
+    return (
+      <SelectGroupScreen
+        onBack={() => setScreen('home')}
+        onSelect={(info) => {
+          setGroupContext(info);
+          setAddExpenseSource('select-group');
+          setScreen('add-expense');
+        }}
+      />
+    );
+  }
+
   if (screen === 'add-expense') {
     return (
       <AddExpenseScreen
@@ -157,7 +177,7 @@ function AppNavigator() {
         groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
         members={groupContext?.members ?? []}
         myUserId={groupContext?.myUserId ?? ''}
-        onBack={() => setScreen('group')}
+        onBack={() => setScreen(addExpenseSource === 'select-group' ? 'select-group' : 'group')}
         onSave={async (expense) => {
           if (!groupContext) return;
           try {
@@ -165,7 +185,7 @@ function AppNavigator() {
           } catch (err: any) {
             console.error('Failed to save expense:', err.message);
           }
-          setScreen('group');
+          setScreen(addExpenseSource === 'select-group' ? 'home' : 'group');
         }}
       />
     );
@@ -174,15 +194,13 @@ function AppNavigator() {
   if (screen === 'expense-detail') {
     return (
       <ExpenseDetailScreen
+        expenseId={activeExpenseId ?? ''}
         onBack={() => setScreen('group')}
         onEdit={(id) => {
           setActiveExpenseId(id);
           setScreen('edit-expense');
         }}
-        onDelete={(id) => {
-          console.log('Deleted expense:', id);
-          setScreen('group');
-        }}
+        onDelete={() => setScreen('group')}
       />
     );
   }
@@ -190,12 +208,12 @@ function AppNavigator() {
   if (screen === 'edit-expense') {
     return (
       <EditExpenseScreen
-        expenseId={activeExpenseId ?? 'e1'}
+        expenseId={activeExpenseId ?? ''}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        members={groupContext?.members ?? []}
+        myUserId={groupContext?.myUserId ?? ''}
         onBack={() => setScreen('expense-detail')}
-        onSave={(data) => {
-          console.log('Expense updated:', data);
-          setScreen('group');
-        }}
+        onSave={() => setScreen('group')}
       />
     );
   }
@@ -218,11 +236,19 @@ function AppNavigator() {
   if (screen === 'settle-up') {
     return (
       <SettleUpScreen
-        groupName="Pokhara Trip"
-        groupCurrency="NPR"
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        groupName={groupContext?.groupName ?? ''}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
         onBack={() => setScreen('group')}
-        onSettle={(settlement) => {
-          console.log('Settlement:', settlement);
+        onSettle={async (settlement) => {
+          const gid = groupContext?.groupId ?? activeGroupId;
+          if (!gid) return;
+          try {
+            await apiService.recordSettlement(gid, settlement);
+          } catch (err: any) {
+            console.error('Failed to record settlement:', err.message);
+          }
+          setScreen('group');
         }}
       />
     );
@@ -255,16 +281,19 @@ function AppNavigator() {
   if (screen === 'group-settings') {
     return (
       <GroupSettingsScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        groupName={groupContext?.groupName ?? ''}
+        groupEmoji={groupContext?.groupEmoji ?? '👥'}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        members={(groupContext?.members ?? []).map(m => ({ ...m, role: (m.id === groupContext?.myUserId ? 'admin' : 'member') as 'admin' | 'member' }))}
+        myUserId={groupContext?.myUserId ?? ''}
         onBack={() => setScreen('group')}
-        onSave={(data) => {
-          console.log('Group settings saved:', data);
-          setScreen('group');
-        }}
-        onInviteMember={() => console.log('invite member')}
-        onRemoveMember={(id) => console.log('remove member:', id)}
-        onPromoteMember={(id) => console.log('promote member:', id)}
+        onSave={() => setScreen('group')}
+        onInviteMember={() => {}}
+        onRemoveMember={() => {}}
+        onPromoteMember={() => {}}
         onDeleteGroup={() => {
-          console.log('group deleted');
+          setRefreshKey(k => k + 1);
           setScreen('home');
         }}
       />
@@ -274,6 +303,11 @@ function AppNavigator() {
   if (screen === 'member-history') {
     return (
       <MemberHistoryScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        memberId={activeMemberId ?? ''}
+        memberName={activeMemberName}
+        memberColor={activeMemberColor}
+        currency={groupContext?.groupCurrency ?? 'NPR'}
         onBack={() => setScreen('group')}
       />
     );
@@ -286,14 +320,31 @@ function AppNavigator() {
         onBack={() => setScreen('home')}
         onAddExpense={(info) => {
           setGroupContext(info);
+          setAddExpenseSource('group');
           setScreen('add-expense');
         }}
-        onSettleUp={() => setScreen('settle-up')}
+        onSettleUp={(info) => {
+          setGroupContext(prev => prev
+            ? { ...prev, ...info }
+            : { ...info, members: [], myUserId: '' }
+          );
+          setScreen('settle-up');
+        }}
         onExpenseTap={(id) => {
           setActiveExpenseId(id);
           setScreen('expense-detail');
         }}
-        onOpenSettings={() => setScreen('group-settings')}
+        onOpenSettings={(info) => {
+          setGroupContext({
+            groupId: info.groupId,
+            groupName: info.groupName,
+            groupEmoji: info.groupEmoji,
+            groupCurrency: info.groupCurrency,
+            members: info.members,
+            myUserId: info.myUserId,
+          });
+          setScreen('group-settings');
+        }}
       />
     );
   }
@@ -303,6 +354,8 @@ function AppNavigator() {
   if (screen === 'analytics') {
     return (
       <AnalyticsScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        groupName={groupContext?.groupName ?? ''}
         onBack={() => setScreen('group')}
         onExport={() => setScreen('export')}
       />
@@ -312,6 +365,7 @@ function AppNavigator() {
   if (screen === 'export') {
     return (
       <ExportScreen
+        groupName={groupContext?.groupName ?? ''}
         onBack={() => setScreen('analytics')}
         onExport={(format, scope) => {
           console.log('Export:', format, scope);
@@ -355,7 +409,7 @@ function AppNavigator() {
           setActiveGroupId(id);
           setScreen('group');
         }}
-        onAddExpense={() => setScreen('add-expense')}
+        onAddExpense={() => setScreen('select-group')}
         onScanReceipt={() => setScreen('scan-receipt')}
         onCreateGroup={() => setScreen('create-group')}
         onOpenNotifications={() => setActiveTab('activity')}
