@@ -390,6 +390,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
 
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => Alert.alert('Add Friend', 'Invite a friend by opening a shared group from Groups or use the group settings invite flow.')}
+            style={styles.addFriendButton}
+          >
+            <Icon name="plus" size={16} color={COLORS.WHITE} />
+            <Text style={styles.addFriendText}>Add Friend</Text>
+          </TouchableOpacity>
+
           <View style={[styles.balanceCard, { marginTop: 20 }]}> 
             <View style={styles.balanceRow}>
               <Text style={styles.balanceAmount}>{friendCount}</Text>
@@ -1038,6 +1047,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.GRAY200,
     marginBottom: 14,
+  },
+  addFriendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.CRIMSON,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 12,
+  },
+  addFriendText: {
+    color: COLORS.WHITE,
+    fontWeight: '700',
+    fontSize: 13,
+    marginLeft: 8,
   },
   friendBlock: {
     marginBottom: 12,
