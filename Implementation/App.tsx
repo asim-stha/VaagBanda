@@ -234,8 +234,17 @@ function AppNavigator() {
     return (
       <CreateGroupScreen
         onBack={() => setScreen('home')}
-        onCreate={(group) => {
-          console.log('Group created:', group);
+        onCreate={async (group) => {
+          try {
+            await apiService.createGroup({
+              name: group.name,
+              emoji: group.emoji,
+              currency: group.currency,
+              memberIds: group.memberIds,
+            });
+          } catch (err: any) {
+            console.error('Failed to create group:', err.message);
+          }
           setRefreshKey(k => k + 1);
           setScreen('home');
         }}

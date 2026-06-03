@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -181,46 +181,62 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
   const [search, setSearch] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]); // contact ids
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; avatarColor: string } | null>(null);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [searchResults, setSearchResults] = useState<Contact[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, avatar_color')
+        .eq('user_id', user.id)
+        .single();
+      if (data) {
+        setCurrentUser({
+          id: data.user_id,
+          name: data.full_name || 'Me',
+          avatarColor: data.avatar_color || colorFromId(data.user_id),
+        });
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
     let cancelled = false;
+    setSearchLoading(true);
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const currentId = user?.id ?? '';
-
         const { data, error } = await supabase
           .from('profiles')
-          .select('user_id, full_name, avatar_color')
-          .neq('user_id', currentId);
-
+          .select('user_id, full_name, email, avatar_color')
+          .neq('user_id', currentUserId)
+          .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`)
+          .limit(10);
         if (!cancelled && !error && data) {
-          setContacts(data.map((p: any) => ({
+          setSearchResults(data.map((p: any) => ({
             id: p.user_id,
             name: p.full_name || 'Unknown',
-            email: '',
+            email: p.email || '',
             avatarColor: p.avatar_color || colorFromId(p.user_id),
             isRegistered: true,
           })));
         }
       } finally {
-        if (!cancelled) setLoadingContacts(false);
+        if (!cancelled) setSearchLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
-
-  // Filter contacts by search
-  const filteredContacts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return contacts;
-    return contacts.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q)
-    );
-  }, [search, contacts]);
+  }, [search, currentUserId]);
 
   // Validation
   const canCreate = name.trim().length >= 2;
@@ -243,7 +259,6 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
     });
   };
 
-  const selectedCategoryObj = CATEGORIES.find(c => c.key === category) ?? CATEGORIES[0];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -433,11 +448,13 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
 
             {/* You (always included as admin) */}
             <View style={styles.youCard}>
-              <View style={[styles.avatar, { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.CRIMSON }]}>
-                <Text style={[styles.avatarText, { fontSize: 16 }]}>Y</Text>
+              <View style={[styles.avatar, { width: 40, height: 40, borderRadius: 20, backgroundColor: currentUser?.avatarColor || COLORS.CRIMSON }]}>
+                <Text style={[styles.avatarText, { fontSize: 16 }]}>
+                  {(currentUser?.name || 'You').charAt(0).toUpperCase()}
+                </Text>
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.youName}>You</Text>
+                <Text style={styles.youName}>{currentUser?.name || 'You'}</Text>
                 <Text style={styles.youLabel}>Group admin</Text>
               </View>
               <View style={styles.adminBadge}>
@@ -466,9 +483,17 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
 
             {/* Contact list */}
             <View style={styles.contactList}>
-              {loadingContacts ? (
+              {search.trim().length < 2 ? (
+                <View style={styles.contactEmpty}>
+                  <Text style={styles.contactEmojiBig}>🔍</Text>
+                  <Text style={styles.contactEmptyTitle}>Search for members</Text>
+                  <Text style={styles.contactEmptyDesc}>
+                    Type at least 2 characters to search
+                  </Text>
+                </View>
+              ) : searchLoading ? (
                 <ActivityIndicator style={{ paddingVertical: 24 }} color={COLORS.CRIMSON} />
-              ) : filteredContacts.length === 0 ? (
+              ) : searchResults.length === 0 ? (
                 <View style={styles.contactEmpty}>
                   <Text style={styles.contactEmojiBig}>🔍</Text>
                   <Text style={styles.contactEmptyTitle}>
@@ -488,9 +513,9 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
                   </TouchableOpacity>
                 </View>
               ) : (
-                filteredContacts.map((c, idx) => {
+                searchResults.map((c, idx) => {
                   const selected = selectedMembers.includes(c.id);
-                  const isLast = idx === filteredContacts.length - 1;
+                  const isLast = idx === searchResults.length - 1;
                   return (
                     <TouchableOpacity
                       key={c.id}
