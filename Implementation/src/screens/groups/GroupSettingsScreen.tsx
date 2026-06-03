@@ -57,6 +57,8 @@ const GroupSettingsScreen: React.FC<Props> = ({
     const [currency, setCurrency] = useState(groupCurrency);
     const [members, setMembers] = useState<Member[]>(membersProp);
     const [currentUserId, setCurrentUserId] = useState(myUserId);
+    const currentMember = members.find(m => m.id === currentUserId);
+    const canDeleteGroup = currentMember?.role === 'admin';
     const [loadingGroup, setLoadingGroup] = useState(!!groupId && !membersProp.length);
 
     useEffect(() => {
@@ -68,7 +70,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
                 setEmoji(data.emoji);
                 setCurrency(data.currency);
                 setCurrentUserId(data.myUserId);
-                setMembers(data.members.map(m => ({ ...m, role: (m.id === data.myUserId ? 'admin' : 'member') as 'admin' | 'member' })));
+                setMembers(data.members);
             })
             .catch(() => {})
             .finally(() => setLoadingGroup(false));
@@ -81,7 +83,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
                 text: 'Delete', style: 'destructive', onPress: async () => {
                     try {
                         await apiService.deleteGroup(groupId!);
-                        onBack?.();
+                        onDeleteGroup?.();
                     } catch (e: any) {
                         Alert.alert('Error', e.message || 'Failed to delete group');
                     }
@@ -159,14 +161,15 @@ const GroupSettingsScreen: React.FC<Props> = ({
                         })}
                     </View>
 
-                    {/* Danger zone */}
-                    <View style={s.dangerZone}>
-                        <Text style={s.dangerLabel}>DANGER ZONE</Text>
-                        <TouchableOpacity onPress={handleDelete} activeOpacity={0.7} style={s.deleteBtn}>
-                            <Icon name="trash" size={16} color={C.CRIMSON} />
-                            <Text style={s.deleteBtnText}>Delete this group</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {canDeleteGroup && (
+                        <View style={s.dangerZone}>
+                            <Text style={s.dangerLabel}>DANGER ZONE</Text>
+                            <TouchableOpacity onPress={handleDelete} activeOpacity={0.7} style={s.deleteBtn}>
+                                <Icon name="trash" size={16} color={C.CRIMSON} />
+                                <Text style={s.deleteBtnText}>Delete this group</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>

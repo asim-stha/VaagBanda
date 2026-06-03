@@ -17,6 +17,7 @@ export interface GroupMember {
   name: string;
   avatarColor: string;
   balance: number;
+  role: 'admin' | 'member';
 }
 
 export interface GroupExpense {
@@ -37,6 +38,7 @@ export interface GroupDetail {
   emoji: string;
   currency: string;
   myUserId: string;
+  myRole: 'admin' | 'member';
   members: GroupMember[];
   expenses: GroupExpense[];
 }
@@ -231,7 +233,11 @@ export const apiService = {
 
     const memberIds = Array.from(new Set([userId, ...group.memberIds]));
     const { error: mErr } = await supabase.from('group_members').insert(
-      memberIds.map(uid => ({ group_id: newGroup.group_id, user_id: uid }))
+      memberIds.map(uid => ({
+        group_id: newGroup.group_id,
+        user_id: uid,
+        role: uid === userId ? 'admin' : 'member',
+      }))
     );
     if (mErr) throw new Error(mErr.message);
 
@@ -255,7 +261,7 @@ export const apiService = {
       .from('groups')
       .select(`
         group_id, group_name, emoji, default_currency,
-        group_members(user_id, profiles(user_id, full_name, avatar_color)),
+        group_members(user_id, role, profiles(user_id, full_name, avatar_color)),
         expenses(expense_id, paid_by, title, category, amount, created_at,
           expense_splits(user_id, amount_owed)),
         settlements(settlement_id, payer_id, payee_id, amount, created_at)
@@ -277,6 +283,7 @@ export const apiService = {
         name: profile?.full_name || 'Unknown',
         avatarColor: profile?.avatar_color || avatarColorFromId(gm.user_id),
         balance: computeBalance(allExpenses, allSettlements, gm.user_id),
+        role: (gm.role || 'member') as 'admin' | 'member',
       };
     });
 
@@ -301,6 +308,8 @@ export const apiService = {
         };
       });
 
+    const myRole = ((g.group_members || []).find((gm: any) => gm.user_id === userId)?.role || 'member') as 'admin' | 'member';
+
     return {
       data: {
         id: g.group_id,
@@ -308,6 +317,7 @@ export const apiService = {
         emoji: g.emoji || '👥',
         currency: g.default_currency,
         myUserId: userId,
+        myRole,
         members,
         expenses,
       },
@@ -410,13 +420,40 @@ export const apiService = {
   },
 
   async deleteGroup(groupId: string): Promise<void> {
-    const { data: expenses, error: fetchErr } = await supabase
-      .from('expenses')
-      .select('expense_id')
-      .eq('group_id', groupId);
-    if (fetchErr) throw new Error(fetchErr.message);
+    const userId = await getCurrentUserId();
 
-    const expenseIds = (expenses || []).map((e: any) => e.expense_id);
+    // Only admins may delete the group
+    const { data: membership, error: roleErr } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+    if (roleErr || !membership) throw new Error('You are not a member of this group');
+    if (membership.role !== 'admin') throw new Error('Only admins can delete the group');
+
+    // Fetch all data needed for balance check
+    const { data: expenseRows } = await supabase
+      .from('expenses')
+      .select('expense_id, paid_by, amount, created_at, expense_splits(user_id, amount_owed)')
+      .eq('group_id', groupId);
+    const { data: settlementRows } = await supabase
+      .from('settlements')
+      .select('payer_id, payee_id, amount, created_at')
+      .eq('group_id', groupId);
+    const { data: memberRows } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupId);
+
+    const allExpenses: DbExpense[] = (expenseRows || []).map((e: any) => ({ ...e, expense_splits: e.expense_splits || [] }));
+    const allSettlements: DbSettlement[] = settlementRows || [];
+    const hasUnsettled = (memberRows || []).some(
+      (m: any) => Math.abs(computeBalance(allExpenses, allSettlements, m.user_id)) > 0.01
+    );
+    if (hasUnsettled) throw new Error('Please settle all balances before deleting the group');
+
+    const expenseIds = allExpenses.map((e: any) => e.expense_id);
     if (expenseIds.length > 0) {
       const { error: esErr } = await supabase
         .from('expense_splits')

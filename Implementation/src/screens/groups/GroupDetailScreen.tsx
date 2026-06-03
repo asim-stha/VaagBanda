@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { apiService, GroupDetail as ApiGroupDetail } from '../../services/apiService';
+import { apiService } from '../../services/apiService';
 import {
   View,
   Text,
@@ -96,6 +96,7 @@ interface Member {
   name: string;
   avatarColor: string;
   balance: number; // positive = is owed; negative = owes
+  role: 'admin' | 'member';
 }
 
 interface Expense {
@@ -115,6 +116,7 @@ interface GroupDetail {
   name: string;
   emoji: string;
   currency: string;
+  myRole: 'admin' | 'member';
   members: Member[];
   expenses: Expense[];
   myUserId: string;
@@ -235,6 +237,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
           emoji: data.emoji,
           currency: data.currency,
           myUserId: data.myUserId,
+          myRole: data.myRole,
           members: data.members,
           expenses: data.expenses as any,
         });
