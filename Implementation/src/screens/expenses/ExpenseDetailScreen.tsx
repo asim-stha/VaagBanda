@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, SafeAreaView, Alert,
 } from 'react-native';
+import { apiService } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline, Circle } from 'react-native-svg';
 
@@ -63,7 +64,16 @@ const ExpenseDetailScreen: React.FC<Props> = ({ expense = MOCK, onBack, onEdit, 
     const handleDelete = () => {
         Alert.alert('Delete expense', `Remove "${expense.description}"? This cannot be undone.`, [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => onDelete?.(expense.id) },
+            {
+                text: 'Delete', style: 'destructive', onPress: async () => {
+                    try {
+                        await apiService.deleteExpense(expense.id);
+                        onBack?.();
+                    } catch (e: any) {
+                        Alert.alert('Error', e.message || 'Failed to delete expense');
+                    }
+                },
+            },
         ]);
     };
 

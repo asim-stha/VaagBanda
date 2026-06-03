@@ -3,6 +3,7 @@ import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
     KeyboardAvoidingView, Platform, StatusBar, SafeAreaView, Alert,
 } from 'react-native';
+import { apiService } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline } from 'react-native-svg';
 
@@ -44,6 +45,7 @@ interface Props {
     expenseId?: string;
     initialAmount?: string;
     initialDescription?: string;
+    initialCategory?: string;
     initialParticipants?: string[];
     groupCurrency?: string;
     members?: Member[];
@@ -56,6 +58,7 @@ const EditExpenseScreen: React.FC<Props> = ({
     expenseId = 'e1',
     initialAmount = '8000',
     initialDescription = 'Hotel — 2 nights',
+    initialCategory = 'other',
     initialParticipants = ['u1', 'u2', 'u3', 'u4', 'u5'],
     groupCurrency = 'NPR',
     members = MOCK_MEMBERS,
@@ -64,6 +67,7 @@ const EditExpenseScreen: React.FC<Props> = ({
 }) => {
     const [amount, setAmount] = useState(initialAmount);
     const [description, setDescription] = useState(initialDescription);
+    const [category] = useState(initialCategory);
     const [participants, setParticipants] = useState<string[]>(initialParticipants);
 
     const amountNum = useMemo(() => { const p = parseFloat(amount.replace(/,/g, '')); return isNaN(p) ? 0 : p; }, [amount]);
@@ -82,6 +86,24 @@ const EditExpenseScreen: React.FC<Props> = ({
         setAmount(cleaned);
     };
 
+    const handleSave = async () => {
+        if (!canSave) return;
+        const shares: Record<string, number> = {};
+        participants.forEach(pid => { shares[pid] = perPerson; });
+        try {
+            await apiService.updateExpense(expenseId, {
+                description: description.trim(),
+                amount: amountNum,
+                category,
+                participants,
+                shares,
+            });
+            onBack?.();
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Failed to update expense');
+        }
+    };
+
     return (
         <SafeAreaView style={s.safe}>
             <StatusBar barStyle="light-content" backgroundColor={C.BLUE_DARK} />
@@ -91,7 +113,7 @@ const EditExpenseScreen: React.FC<Props> = ({
                         <View style={s.topRow}>
                             <TouchableOpacity onPress={onBack} activeOpacity={0.7} style={s.iconBtn}><Icon name="back" size={18} color={C.WHITE} /></TouchableOpacity>
                             <Text style={s.headerTitle}>Edit Expense</Text>
-                            <TouchableOpacity onPress={() => canSave && onSave?.({ id: expenseId, amount: amountNum, description: description.trim(), participants })} disabled={!canSave} activeOpacity={0.7} style={[s.saveBtn, !canSave && s.saveBtnDisabled]}>
+                            <TouchableOpacity onPress={handleSave} disabled={!canSave} activeOpacity={0.7} style={[s.saveBtn, !canSave && s.saveBtnDisabled]}>
                                 <Text style={[s.saveBtnText, !canSave && s.saveBtnTextDisabled]}>Save</Text>
                             </TouchableOpacity>
                         </View>
@@ -134,7 +156,7 @@ const EditExpenseScreen: React.FC<Props> = ({
                             </View>
                         )}
 
-                        <TouchableOpacity activeOpacity={0.85} onPress={() => canSave && onSave?.({ id: expenseId, amount: amountNum, description: description.trim(), participants })} disabled={!canSave} style={{ marginTop: 22 }}>
+                        <TouchableOpacity activeOpacity={0.85} onPress={handleSave} disabled={!canSave} style={{ marginTop: 22 }}>
                             {canSave ? (
                                 <LinearGradient colors={[C.CRIMSON, C.CRIMSON_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.btn}><Text style={s.btnText}>Update Expense</Text></LinearGradient>
                             ) : (

@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { apiService, GroupDetail as ApiGroupDetail } from '../../services/apiService';
 import {
   View,
   Text,
@@ -219,9 +220,10 @@ const MemberRow = ({
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface GroupDetailScreenProps {
+  groupId?: string;
   group?: GroupDetail;
   onBack?: () => void;
-  onAddExpense?: () => void;
+  onAddExpense?: (groupInfo: { groupId: string; groupName: string; groupCurrency: string; members: Member[]; myUserId: string }) => void;
   onSettleUp?: () => void;
   onExpenseTap?: (expenseId: string) => void;
   onOpenSettings?: () => void;
@@ -229,7 +231,8 @@ interface GroupDetailScreenProps {
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
 const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
-  group = MOCK_GROUP,
+  groupId,
+  group: groupProp,
   onBack,
   onAddExpense,
   onSettleUp,
@@ -237,12 +240,58 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
   onOpenSettings,
 }) => {
   const [tab, setTab] = useState<'expenses' | 'balances'>('expenses');
+  const [group, setGroup] = useState<GroupDetail>(groupProp ?? MOCK_GROUP);
+  const [loading, setLoading] = useState(!!groupId);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!groupId) return;
+    setLoading(true);
+    setError(null);
+    apiService.getGroup(groupId)
+      .then(({ data }) => {
+        setGroup({
+          id: data.id,
+          name: data.name,
+          emoji: data.emoji,
+          currency: data.currency,
+          myUserId: data.myUserId,
+          members: data.members,
+          expenses: data.expenses as any,
+        });
+      })
+      .catch((err) => setError(err.message || 'Failed to load group'))
+      .finally(() => setLoading(false));
+  }, [groupId]);
 
   const myMember = useMemo(
     () => group.members.find(m => m.id === group.myUserId),
     [group]
   );
   const myBalance = myMember?.balance ?? 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: COLORS.GRAY600, fontSize: 14 }}>Loading group…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: COLORS.CRIMSON, fontSize: 14, textAlign: 'center' }}>{error}</Text>
+          <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
+            <Text style={{ color: COLORS.BLUE, fontWeight: '700' }}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -353,7 +402,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
                 <Text style={styles.emptyDesc}>
                   Add the first expense to get this group going
                 </Text>
-                <TouchableOpacity activeOpacity={0.85} onPress={onAddExpense} style={{ marginTop: 16 }}>
+                <TouchableOpacity activeOpacity={0.85} onPress={() => onAddExpense?.({ groupId: group.id, groupName: group.name, groupCurrency: group.currency, members: group.members, myUserId: group.myUserId })} style={{ marginTop: 16 }}>
                   <LinearGradient
                     colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
                     start={{ x: 0, y: 0 }}
@@ -415,7 +464,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
 
       {/* ─── FLOATING ADD EXPENSE BUTTON ─── */}
       <TouchableOpacity
-        onPress={onAddExpense}
+        onPress={() => onAddExpense?.({ groupId: group.id, groupName: group.name, groupCurrency: group.currency, members: group.members, myUserId: group.myUserId })}
         activeOpacity={0.85}
         style={styles.fab}
       >

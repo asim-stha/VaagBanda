@@ -363,4 +363,76 @@ export const apiService = {
     const { data: group } = await apiService.getGroup(groupId);
     return { data: {}, group };
   },
+
+  async deleteGroup(groupId: string): Promise<void> {
+    const { data: expenses, error: fetchErr } = await supabase
+      .from('expenses')
+      .select('expense_id')
+      .eq('group_id', groupId);
+    if (fetchErr) throw new Error(fetchErr.message);
+
+    const expenseIds = (expenses || []).map((e: any) => e.expense_id);
+    if (expenseIds.length > 0) {
+      const { error: esErr } = await supabase
+        .from('expense_splits')
+        .delete()
+        .in('expense_id', expenseIds);
+      if (esErr) throw new Error(esErr.message);
+    }
+
+    const { error: eErr } = await supabase.from('expenses').delete().eq('group_id', groupId);
+    if (eErr) throw new Error(eErr.message);
+
+    const { error: sErr } = await supabase.from('settlements').delete().eq('group_id', groupId);
+    if (sErr) throw new Error(sErr.message);
+
+    const { error: mErr } = await supabase.from('group_members').delete().eq('group_id', groupId);
+    if (mErr) throw new Error(mErr.message);
+
+    const { error: gErr } = await supabase.from('groups').delete().eq('group_id', groupId);
+    if (gErr) throw new Error(gErr.message);
+  },
+
+  async deleteExpense(expenseId: string): Promise<void> {
+    const { error: esErr } = await supabase
+      .from('expense_splits')
+      .delete()
+      .eq('expense_id', expenseId);
+    if (esErr) throw new Error(esErr.message);
+
+    const { error: eErr } = await supabase.from('expenses').delete().eq('expense_id', expenseId);
+    if (eErr) throw new Error(eErr.message);
+  },
+
+  async updateExpense(expenseId: string, data: {
+    description: string;
+    amount: number;
+    category: string;
+    participants: string[];
+    shares: Record<string, number>;
+  }): Promise<void> {
+    const { error: uErr } = await supabase
+      .from('expenses')
+      .update({
+        title: data.description,
+        amount: data.amount,
+        category: data.category,
+      })
+      .eq('expense_id', expenseId);
+    if (uErr) throw new Error(uErr.message);
+
+    const { error: dErr } = await supabase
+      .from('expense_splits')
+      .delete()
+      .eq('expense_id', expenseId);
+    if (dErr) throw new Error(dErr.message);
+
+    const splits = data.participants.map(pid => ({
+      expense_id: expenseId,
+      user_id: pid,
+      amount_owed: data.shares[pid],
+    }));
+    const { error: iErr } = await supabase.from('expense_splits').insert(splits);
+    if (iErr) throw new Error(iErr.message);
+  },
 };

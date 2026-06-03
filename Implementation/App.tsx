@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { authService } from './src/services/authService';
+import { apiService } from './src/services/apiService';
 
 // Auth screens
 import SplashScreen from './src/screens/auth/SplashScreen';
@@ -26,7 +27,7 @@ import ScanReceiptScreen from './src/screens/expenses/ScanReceiptScreen';
 // Settlement
 import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
 
-// Tab screens
+// Tab screens (rendered inside HomeScreen)
 import ActivityScreen from './src/screens/tabs/ActivityScreen';
 import ProfileScreen from './src/screens/tabs/ProfileScreen';
 
@@ -62,6 +63,14 @@ type Screen =
 
 type Tab = 'home' | 'groups' | 'activity' | 'profile';
 
+interface GroupContext {
+  groupId: string;
+  groupName: string;
+  groupCurrency: string;
+  members: Array<{ id: string; name: string; avatarColor: string; balance: number }>;
+  myUserId: string;
+}
+
 /* ─── INNER NAVIGATOR ──────────────────────────────────────── */
 function AppNavigator() {
   const { user, loading, signOut } = useAuth();
@@ -70,6 +79,7 @@ function AppNavigator() {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string>('');
+  const [groupContext, setGroupContext] = useState<GroupContext | null>(null);
 
   // Once Supabase finishes loading the session, go to the right screen
   useEffect(() => {
@@ -103,8 +113,7 @@ function AppNavigator() {
             setPendingVerifyEmail(data.email);
             setScreen('verify-email');
           }
-          // If needsVerification is false, Supabase auto-confirmed the user.
-          // The useEffect above will detect the session and go to 'home'.
+          // If needsVerification is false, useEffect above detects session and goes to 'home'
         }}
         onGoogleSignup={() => console.log('google signup')}
         onAppleSignup={() => console.log('apple signup')}
@@ -142,11 +151,18 @@ function AppNavigator() {
   if (screen === 'add-expense') {
     return (
       <AddExpenseScreen
-        groupName="Pokhara Trip"
-        groupCurrency="NPR"
+        groupName={groupContext?.groupName ?? ''}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        members={groupContext?.members ?? []}
+        myUserId={groupContext?.myUserId ?? ''}
         onBack={() => setScreen('group')}
-        onSave={(expense) => {
-          console.log('Expense saved:', expense);
+        onSave={async (expense) => {
+          if (!groupContext) return;
+          try {
+            await apiService.addExpense(groupContext.groupId, expense);
+          } catch (err: any) {
+            console.error('Failed to save expense:', err.message);
+          }
           setScreen('group');
         }}
       />
@@ -254,8 +270,12 @@ function AppNavigator() {
   if (screen === 'group') {
     return (
       <GroupDetailScreen
+        groupId={activeGroupId ?? undefined}
         onBack={() => setScreen('home')}
-        onAddExpense={() => setScreen('add-expense')}
+        onAddExpense={(info) => {
+          setGroupContext(info);
+          setScreen('add-expense');
+        }}
         onSettleUp={() => setScreen('settle-up')}
         onExpenseTap={(id) => {
           setActiveExpenseId(id);
@@ -311,7 +331,7 @@ function AppNavigator() {
     );
   }
 
-  /* ─── HOME ─── */
+  /* ─── HOME (with tab handling) ─── */
 
   if (screen === 'home') {
     return (
@@ -330,7 +350,7 @@ function AppNavigator() {
         onNotificationSettings={() => setScreen('notification-settings')}
         onLogout={async () => {
           await signOut();
-          // useEffect above will detect user becoming null and go to 'login'
+          // useEffect above detects user → null and goes to 'login'
         }}
       />
     );

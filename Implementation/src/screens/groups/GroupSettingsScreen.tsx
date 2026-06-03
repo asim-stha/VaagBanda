@@ -5,6 +5,7 @@ import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
     StatusBar, SafeAreaView, Alert,
 } from 'react-native';
+import { apiService } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline, Circle } from 'react-native-svg';
 
@@ -43,6 +44,7 @@ const MOCK_MEMBERS: Member[] = [
 ];
 
 interface Props {
+    groupId?: string;
     groupName?: string; groupEmoji?: string; groupCurrency?: string;
     members?: Member[]; myUserId?: string;
     onBack?: () => void; onSave?: (data: { name: string }) => void;
@@ -51,6 +53,7 @@ interface Props {
 }
 
 const GroupSettingsScreen: React.FC<Props> = ({
+    groupId,
     groupName = 'Pokhara Trip', groupEmoji = '🏔️', groupCurrency = 'NPR',
     members = MOCK_MEMBERS, myUserId = 'u1',
     onBack, onSave, onInviteMember, onRemoveMember, onPromoteMember, onDeleteGroup,
@@ -60,7 +63,16 @@ const GroupSettingsScreen: React.FC<Props> = ({
     const handleDelete = () => {
         Alert.alert('Delete group', 'This will permanently remove the group and all its data. This cannot be undone.', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: onDeleteGroup },
+            {
+                text: 'Delete', style: 'destructive', onPress: async () => {
+                    try {
+                        await apiService.deleteGroup(groupId!);
+                        onBack?.();
+                    } catch (e: any) {
+                        Alert.alert('Error', e.message || 'Failed to delete group');
+                    }
+                },
+            },
         ]);
     };
 
