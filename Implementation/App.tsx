@@ -241,18 +241,21 @@ function AppNavigator() {
     );
   }
 
-  if (screen === 'scan-receipt') {
+if (screen === 'scan-receipt') {
     return (
-      <ScanReceiptScreen
-        onBack={() => setScreen('home')}
-        onCapture={(uri) => {
-          console.log('Receipt captured:', uri);
-          setScreen('add-expense');
-        }}
-        onManualEntry={() => setScreen('add-expense')}
-      />
+        <ScanReceiptScreen
+            onBack={() => setScreen('home')}
+            onCapture={(uri, text) => {       // 👈 receive text here
+                console.log('Receipt captured:', uri);
+                console.log('Extracted text:', text);
+                // TODO: pass text to AddExpenseScreen to prefill fields
+                setScreen('add-expense');
+            }}
+            onManualEntry={() => setScreen('add-expense')}
+        />
     );
-  }
+}
+
 
   /* ─── SETTLEMENT ─── */
 

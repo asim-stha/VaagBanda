@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
+import { scanImageOCR } from '../../lib/ocr';
 
 const C = { CRIMSON: '#DC143C', CRIMSON_DARK: '#A01030', BLUE: '#1A2B5F', BLUE_DARK: '#0F1F4A', WHITE: '#FFFFFF', GHOST: '#F7F8FB', GRAY200: '#E1E5EE', GRAY400: '#9AA3B5', GRAY600: '#5A6478', GRAY800: '#1F2A44' };
 
@@ -16,25 +17,61 @@ const Icon = ({ name, size = 18, color = C.GRAY400 }: { name: string; size?: num
     return null;
 };
 
-interface Props { onBack?: () => void; onCapture?: (uri: string) => void; onManualEntry?: () => void; }
+interface Props {
+    onBack?: () => void;
+    onCapture?: (uri: string, text: string) => void;
+    onManualEntry?: () => void;
+}
 
 const ScanReceiptScreen: React.FC<Props> = ({ onBack, onCapture, onManualEntry }) => {
     const [scanning, setScanning] = useState(false);
 
-    const handleCapture = () => {
-        setScanning(true);
-        // Simulated OCR processing delay
-        setTimeout(() => {
-            setScanning(false);
-            onCapture?.('mock://receipt-image.jpg');
-        }, 2000);
+    const handleGallery = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 1,
+        });
+        if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            setScanning(true);
+            try {
+                const text = await scanImageOCR(uri);
+                setScanning(false);
+                onCapture?.(uri, text);
+            } catch (error) {
+                setScanning(false);
+                alert('Failed to extract text. Please try again.');
+            }
+        }
+    };
+
+    const handleCapture = async () => {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+            alert('Camera permission is required.');
+            return;
+        }
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 1,
+        });
+        if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            setScanning(true);
+            try {
+                const text = await scanImageOCR(uri);
+                setScanning(false);
+                onCapture?.(uri, text);
+            } catch (error) {
+                setScanning(false);
+                alert('Failed to extract text. Please try again.');
+            }
+        }
     };
 
     return (
         <SafeAreaView style={s.safe}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
-
-            {/* Camera viewfinder area (dark placeholder) */}
             <View style={s.viewfinder}>
                 <View style={s.navRow}>
                     <TouchableOpacity onPress={onBack} activeOpacity={0.7} style={s.iconBtn}>
@@ -44,13 +81,11 @@ const ScanReceiptScreen: React.FC<Props> = ({ onBack, onCapture, onManualEntry }
                     <View style={{ width: 36 }} />
                 </View>
 
-                {/* Frame guides */}
                 <View style={s.frameArea}>
                     <View style={[s.corner, s.cornerTL]} />
                     <View style={[s.corner, s.cornerTR]} />
                     <View style={[s.corner, s.cornerBL]} />
                     <View style={[s.corner, s.cornerBR]} />
-
                     {scanning ? (
                         <View style={s.scanningOverlay}>
                             <View style={s.scanLine} />
@@ -65,13 +100,11 @@ const ScanReceiptScreen: React.FC<Props> = ({ onBack, onCapture, onManualEntry }
                     )}
                 </View>
 
-                {/* Bottom controls */}
                 <View style={s.controls}>
                     <TouchableOpacity onPress={onManualEntry} activeOpacity={0.7} style={s.secondaryBtn}>
                         <Icon name="edit" size={20} color={C.WHITE} />
                         <Text style={s.secondaryText}>Enter manually</Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity onPress={handleCapture} activeOpacity={0.85} disabled={scanning} style={s.captureBtn}>
                         <View style={s.captureInner}>
                             {scanning ? (
@@ -81,16 +114,14 @@ const ScanReceiptScreen: React.FC<Props> = ({ onBack, onCapture, onManualEntry }
                             )}
                         </View>
                     </TouchableOpacity>
-
-                    <TouchableOpacity activeOpacity={0.7} style={s.secondaryBtn}>
+                    <TouchableOpacity onPress={handleGallery} activeOpacity={0.7} style={s.secondaryBtn}>
                         <Icon name="upload" size={20} color={C.WHITE} />
                         <Text style={s.secondaryText}>From gallery</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* OCR powered by badge */}
                 <View style={s.poweredBy}>
-                    <Text style={s.poweredByText}>Powered by Google ML Kit OCR</Text>
+                    <Text style={s.poweredByText}>Powered by Claude AI OCR</Text>
                 </View>
             </View>
         </SafeAreaView>
@@ -113,7 +144,7 @@ const s = StyleSheet.create({
     hintText: { color: 'rgba(255,255,255,0.70)', fontSize: 14, fontWeight: '600', textAlign: 'center', marginTop: 14 },
     hintSub: { color: 'rgba(255,255,255,0.40)', fontSize: 11, textAlign: 'center', marginTop: 6, lineHeight: 16 },
     scanningOverlay: { alignItems: 'center' },
-    scanLine: { width: '80%', height: 2, backgroundColor: C.CRIMSON, borderRadius: 1, marginBottom: 16, shadowColor: C.CRIMSON, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8, elevation: 4 },
+    scanLine: { width: '80%', height: 2, backgroundColor: C.CRIMSON, borderRadius: 1, marginBottom: 16 },
     scanningText: { color: C.CRIMSON, fontSize: 14, fontWeight: '700' },
     controls: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10 },
     captureBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: C.WHITE },
