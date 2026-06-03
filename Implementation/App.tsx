@@ -437,12 +437,6 @@ if (screen === 'scan-receipt') {
               })
               .eq('user_id', user.id);
 
-            // Update password if provided
-            if (data.newPassword && data.newPassword.length > 0) {
-              await supabase.auth.updateUser({
-                password: data.newPassword,
-              });
-            }
           } catch (e: any) {
             console.error('Profile update failed:', e.message);
           }
