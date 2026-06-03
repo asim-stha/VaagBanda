@@ -223,22 +223,22 @@ const EditProfileScreen: React.FC<Props> = ({
                         </View>
 
                         <TouchableOpacity activeOpacity={0.85} onPress={handlePickImage} style={s.avatarWrap}>
-    <View style={{ width: 80, height: 80, borderRadius: 40, overflow: 'hidden', backgroundColor: avatarColor }}>
-        {imageUri ? (
-            <Image
-                source={{ uri: imageUri }}
-                style={{ width: 80, height: 80 }}
-                onLoad={() => console.log('Image loaded OK')}
-                onError={(e) => console.log('Image error:', e.nativeEvent.error)}
-            />
-        ) : (
+                        <View style={{ width: 80, height: 80, borderRadius: 40, overflow: 'hidden', backgroundColor: avatarColor }}>
+                                   {imageUri ? (
+                         <Image
+                      source={{ uri: imageUri }}
+                      style={{ width: 80, height: 80 }}
+                      onLoad={() => console.log('Image loaded OK')}
+                     onError={(e) => console.log('Image error:', e.nativeEvent.error)}
+                           />
+                         ) : (
             <LetterAvatar name={name || 'U'} color={avatarColor} size={80} />
-        )}
-    </View>
-    <View style={s.cameraBadge}>
+                         )}
+                     </View>
+                      <View style={s.cameraBadge}>
         <Icon name="camera" size={14} color={C.WHITE} />
-    </View>
-</TouchableOpacity>
+                     </View>
+                         </TouchableOpacity>
                         <Text style={s.changePhotoHint}>Tap to change photo</Text>
                     </LinearGradient>
 
