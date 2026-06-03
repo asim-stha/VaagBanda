@@ -1,13 +1,3 @@
-/**
- * VaagBanda — ActivityScreen.tsx
- * Notification feed — recent transactions, group events, reminders.
- *
- * Maps to SRS §4.6 (Notifications and Reminders) + §3.1 (Activity tab)
- * Renders as a tab view inside HomeScreen.
- *
- * ─── Required dependencies ───
- *   npx expo install expo-linear-gradient react-native-svg
- */
 
 import React, { useState } from 'react';
 import {

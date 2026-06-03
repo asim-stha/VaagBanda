@@ -170,6 +170,9 @@ interface HomeScreenProps {
   onScanReceipt?: () => void;
   onCreateGroup?: () => void;
   onOpenNotifications?: () => void;
+  onEditProfile?: () => void;
+  onNotificationSettings?: () => void;
+  onLogout?: () => void;
   onTabChange?: (tab: 'home' | 'groups' | 'activity' | 'profile') => void;
   activeTab?: 'home' | 'groups' | 'activity' | 'profile';
   hasUnreadNotifications?: boolean;
@@ -439,46 +442,119 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+  // ─── TAB ROUTING (must be before the main return) ───────────
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
-        {renderContent()}
-      </ScrollView>
+  if (activeTab === 'groups') {
+    const owedGroups = groups.filter(g => g.myBalance > 0).length;
+    const oweGroups = groups.filter(g => g.myBalance < 0).length;
+    const settledGroups = groups.filter(g => g.myBalance === 0).length;
 
-      {/* ─── FLOATING ADD BUTTON ─── */}
-      {activeTab !== 'profile' && (
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.CRIMSON_DARK} />
+
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ─── GROUPS HEADER (crimson theme to differentiate from home) ─── */}
+          <LinearGradient
+            colors={[COLORS.CRIMSON_DARK, COLORS.CRIMSON, '#E8365D']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}
+          >
+            <View style={[styles.blob, styles.blob1, { backgroundColor: 'rgba(26,43,95,0.18)' }]} />
+            <View style={[styles.blob, styles.blob2, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+
+            <View style={styles.topRow}>
+              <View>
+                <Text style={[styles.greetingLabel, { fontSize: 13 }]}>Manage</Text>
+                <Text style={[styles.greetingName, { fontSize: 24 }]}>Your Groups</Text>
+              </View>
+              <TouchableOpacity
+                onPress={onCreateGroup}
+                activeOpacity={0.7}
+                style={[styles.bellBtn, { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 14, paddingHorizontal: 14, width: 'auto', flexDirection: 'row', gap: 6 }]}
+              >
+                <Icon name="plus" size={18} color={COLORS.WHITE} />
+                <Text style={{ color: COLORS.WHITE, fontSize: 13, fontWeight: '700' }}>New</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Stats row */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <View style={styles.groupsStatCard}>
+                <Text style={styles.groupsStatNumber}>{groups.length}</Text>
+                <Text style={styles.groupsStatLabel}>Total</Text>
+              </View>
+              <View style={styles.groupsStatCard}>
+                <Text style={[styles.groupsStatNumber, { color: '#A8F0C8' }]}>{owedGroups}</Text>
+                <Text style={styles.groupsStatLabel}>Owed</Text>
+              </View>
+              <View style={styles.groupsStatCard}>
+                <Text style={[styles.groupsStatNumber, { color: '#FFD0D0' }]}>{oweGroups}</Text>
+                <Text style={styles.groupsStatLabel}>You Owe</Text>
+              </View>
+              <View style={styles.groupsStatCard}>
+                <Text style={styles.groupsStatNumber}>{settledGroups}</Text>
+                <Text style={styles.groupsStatLabel}>Settled</Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* ─── GROUP LIST ─── */}
+          <View style={[styles.section, { marginTop: 16 }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>All Groups ({groups.length})</Text>
+            </View>
+
+            {groups.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyEmoji}>👥</Text>
+                <Text style={styles.emptyTitle}>No groups yet</Text>
+                <Text style={styles.emptyDesc}>
+                  Create your first group to start splitting expenses with friends
+                </Text>
+                <TouchableOpacity activeOpacity={0.85} onPress={onCreateGroup} style={{ marginTop: 16 }}>
+                  <LinearGradient
+                    colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.emptyBtn}
+                  >
+                    <Text style={styles.emptyBtnText}>Create Group</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              groups.map(g => (
+                <GroupCard key={g.id} group={g} onPress={() => onGroupTap?.(g.id)} />
+              ))
+            )}
+          </View>
+        </ScrollView>
+
         <TouchableOpacity
-          onPress={onAddExpense}
+          onPress={onCreateGroup}
           activeOpacity={0.85}
           style={styles.fab}
         >
           <LinearGradient
-            colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
+            colors={[COLORS.BLUE, COLORS.BLUE_DARK]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.fabInner}
           >
-            <Icon name="plus" size={26} color={COLORS.WHITE} />
+            <Icon name="addGroup" size={26} color={COLORS.WHITE} />
           </LinearGradient>
         </TouchableOpacity>
-      )}
 
-      {/* ─── BOTTOM TAB BAR ─── */}
-      <TabBar
-        active={activeTab}
-        onTabChange={onTabChange}
-        hasUnread={hasUnreadNotifications}
-      />
-    </SafeAreaView>
-  );
-  // Inside HomeScreen component, at the top of the return:
+        <TabBar active={activeTab} onTabChange={onTabChange} hasUnread={hasUnreadNotifications} />
+      </SafeAreaView>
+    );
+  }
 
   if (activeTab === 'activity') {
     return (
@@ -496,7 +572,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
         <ProfileScreen
           onLogout={() => {
-            // Wire to your auth logic later
             console.log('logout');
           }}
         />
@@ -505,7 +580,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   }
 
-  // ... rest of the existing HomeScreen return (the 'home' tab content)
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {renderContent()}
+      </ScrollView>
+
+      {/* ─── FLOATING ADD BUTTON ─── */}
+      <TouchableOpacity
+        onPress={onAddExpense}
+        activeOpacity={0.85}
+        style={styles.fab}
+      >
+        <LinearGradient
+          colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fabInner}
+        >
+          <Icon name="plus" size={26} color={COLORS.WHITE} />
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* ─── BOTTOM TAB BAR ─── */}
+      <TabBar
+        active={activeTab}
+        onTabChange={onTabChange}
+        hasUnread={hasUnreadNotifications}
+      />
+    </SafeAreaView>
+  );
 };
 
 /* ─── STYLES ───────────────────────────────────────────────── */
@@ -914,6 +1025,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+
+  /* GROUPS TAB STATS */
+  groupsStatCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  groupsStatNumber: {
+    color: COLORS.WHITE,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  groupsStatLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: 2,
   },
 });
 
