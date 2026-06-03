@@ -177,6 +177,7 @@ interface HomeScreenProps {
   onNotificationSettings?: () => void;
   onEditProfile?: () => void;
   onLogout?: () => void;
+  // Trigger TS Server reload
 }
 
 /* ─── QUICK ACTION CARD ────────────────────────────────────── */
