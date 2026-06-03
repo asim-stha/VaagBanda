@@ -43,6 +43,13 @@ export interface GroupDetail {
   expenses: GroupExpense[];
 }
 
+export interface ProfileSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  avatarColor: string;
+}
+
 export interface Creditor {
   id: string;
   name: string;
@@ -119,6 +126,20 @@ async function getCurrentUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   return user.id;
+}
+
+async function requireGroupAdmin(groupId: string): Promise<string> {
+  const userId = await getCurrentUserId();
+  const { data: membership, error } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !membership) throw new Error('You are not a member of this group');
+  if (membership.role !== 'admin') throw new Error('Only admins can manage group members');
+  return userId;
 }
 
 // ─── Extended Types ───────────────────────────────────────────────────────────
@@ -252,6 +273,71 @@ export const apiService = {
         myBalance: 0,
       },
     };
+  },
+
+  async searchProfiles(query: string, excludeUserIds: string[] = []): Promise<{ data: ProfileSearchResult[] }> {
+    const q = query.trim();
+    if (q.length < 2) return { data: [] };
+
+    let request = supabase
+      .from('profiles')
+      .select('user_id, full_name, email, avatar_color')
+      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(10);
+
+    if (excludeUserIds.length > 0) {
+      request = request.not('user_id', 'in', `(${excludeUserIds.join(',')})`);
+    }
+
+    const { data, error } = await request;
+    if (error) throw new Error(error.message);
+
+    return {
+      data: (data || []).map((p: any) => ({
+        id: p.user_id,
+        name: p.full_name || 'Unknown',
+        email: p.email || '',
+        avatarColor: p.avatar_color || avatarColorFromId(p.user_id),
+      })),
+    };
+  },
+
+  async addGroupMember(groupId: string, userIdToAdd: string): Promise<{ data: GroupDetail }> {
+    await requireGroupAdmin(groupId);
+
+    const { data: existing } = await supabase
+      .from('group_members')
+      .select('member_id')
+      .eq('group_id', groupId)
+      .eq('user_id', userIdToAdd)
+      .maybeSingle();
+    if (existing) throw new Error('This user is already in the group');
+
+    const { error } = await supabase.from('group_members').insert({
+      group_id: groupId,
+      user_id: userIdToAdd,
+      role: 'member',
+    });
+    if (error) throw new Error(error.message);
+
+    return apiService.getGroup(groupId);
+  },
+
+  async updateGroupMemberRole(
+    groupId: string,
+    memberId: string,
+    role: 'admin' | 'member',
+  ): Promise<{ data: GroupDetail }> {
+    await requireGroupAdmin(groupId);
+
+    const { error } = await supabase
+      .from('group_members')
+      .update({ role })
+      .eq('group_id', groupId)
+      .eq('user_id', memberId);
+    if (error) throw new Error(error.message);
+
+    return apiService.getGroup(groupId);
   },
 
   async getGroup(groupId: string): Promise<{ data: GroupDetail }> {

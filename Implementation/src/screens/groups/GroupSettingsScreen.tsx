@@ -3,11 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-    StatusBar, Alert,
+    StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { apiService } from '../../services/apiService';
+import { apiService, ProfileSearchResult } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline, Circle } from 'react-native-svg';
 
@@ -58,8 +58,14 @@ const GroupSettingsScreen: React.FC<Props> = ({
     const [members, setMembers] = useState<Member[]>(membersProp);
     const [currentUserId, setCurrentUserId] = useState(myUserId);
     const currentMember = members.find(m => m.id === currentUserId);
-    const canDeleteGroup = currentMember?.role === 'admin';
+    const canManageGroup = currentMember?.role === 'admin';
+    const canDeleteGroup = canManageGroup;
     const [loadingGroup, setLoadingGroup] = useState(!!groupId && !membersProp.length);
+    const [showInvite, setShowInvite] = useState(false);
+    const [inviteQuery, setInviteQuery] = useState('');
+    const [inviteResults, setInviteResults] = useState<ProfileSearchResult[]>([]);
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [memberActionLoading, setMemberActionLoading] = useState<string | null>(null);
 
     useEffect(() => {
         if (!groupId || membersProp.length > 0) return;
@@ -75,6 +81,69 @@ const GroupSettingsScreen: React.FC<Props> = ({
             .catch(() => {})
             .finally(() => setLoadingGroup(false));
     }, [groupId]);
+
+    useEffect(() => {
+        const q = inviteQuery.trim();
+        if (!showInvite || q.length < 2) {
+            setInviteResults([]);
+            return;
+        }
+
+        let cancelled = false;
+        setInviteLoading(true);
+        apiService.searchProfiles(q, members.map(m => m.id))
+            .then(({ data }) => {
+                if (!cancelled) setInviteResults(data);
+            })
+            .catch((e: any) => {
+                if (!cancelled) Alert.alert('Error', e.message || 'Failed to search members');
+            })
+            .finally(() => {
+                if (!cancelled) setInviteLoading(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [showInvite, inviteQuery, members]);
+
+    const handleInviteMember = async (profile: ProfileSearchResult) => {
+        if (!groupId) return;
+        setMemberActionLoading(profile.id);
+        try {
+            const { data } = await apiService.addGroupMember(groupId, profile.id);
+            setMembers(data.members);
+            setCurrentUserId(data.myUserId);
+            setInviteQuery('');
+            setInviteResults([]);
+            setShowInvite(false);
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Failed to invite member');
+        } finally {
+            setMemberActionLoading(null);
+        }
+    };
+
+    const handlePromoteMember = async (member: Member) => {
+        if (!groupId) return;
+        Alert.alert('Make admin', `${member.name} will be able to invite members, promote members, and delete the group after balances are settled.`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Make admin',
+                onPress: async () => {
+                    setMemberActionLoading(member.id);
+                    try {
+                        const { data } = await apiService.updateGroupMemberRole(groupId, member.id, 'admin');
+                        setMembers(data.members);
+                        setCurrentUserId(data.myUserId);
+                        onPromoteMember?.(member.id);
+                    } catch (e: any) {
+                        Alert.alert('Error', e.message || 'Failed to update member role');
+                    } finally {
+                        setMemberActionLoading(null);
+                    }
+                },
+            },
+        ]);
+    };
 
     const handleDelete = () => {
         Alert.alert('Delete group', 'This will permanently remove the group and all its data. This cannot be undone.', [
@@ -126,11 +195,63 @@ const GroupSettingsScreen: React.FC<Props> = ({
 
                     <View style={s.membersHeader}>
                         <Text style={s.label}>MEMBERS ({members.length})</Text>
-                        <TouchableOpacity onPress={onInviteMember} activeOpacity={0.7} style={s.inviteBtn}>
-                            <Icon name="plus" size={14} color={C.CRIMSON} />
-                            <Text style={s.inviteBtnText}>Invite</Text>
-                        </TouchableOpacity>
+                        {canManageGroup && (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setShowInvite(v => !v);
+                                    onInviteMember?.();
+                                }}
+                                activeOpacity={0.7}
+                                style={s.inviteBtn}
+                            >
+                                <Icon name="plus" size={14} color={C.CRIMSON} />
+                                <Text style={s.inviteBtnText}>Invite</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
+
+                    {canManageGroup && showInvite && (
+                        <View style={s.invitePanel}>
+                            <TextInput
+                                value={inviteQuery}
+                                onChangeText={setInviteQuery}
+                                placeholder="Search by name or email"
+                                placeholderTextColor={C.GRAY400}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                style={s.inviteSearch}
+                            />
+
+                            {inviteQuery.trim().length < 2 ? (
+                                <Text style={s.inviteHint}>Type at least 2 characters to find registered users.</Text>
+                            ) : inviteLoading ? (
+                                <ActivityIndicator color={C.CRIMSON} style={{ paddingVertical: 14 }} />
+                            ) : inviteResults.length === 0 ? (
+                                <Text style={s.inviteHint}>No users found.</Text>
+                            ) : (
+                                inviteResults.map((p, i) => (
+                                    <TouchableOpacity
+                                        key={p.id}
+                                        onPress={() => handleInviteMember(p)}
+                                        disabled={memberActionLoading !== null}
+                                        activeOpacity={0.7}
+                                        style={[s.inviteResultRow, i < inviteResults.length - 1 && s.inviteResultBorder]}
+                                    >
+                                        <Avatar name={p.name} color={p.avatarColor} size={34} />
+                                        <View style={{ flex: 1, marginLeft: 10 }}>
+                                            <Text style={s.memberName}>{p.name}</Text>
+                                            <Text style={s.memberRole}>{p.email}</Text>
+                                        </View>
+                                        {memberActionLoading === p.id ? (
+                                            <ActivityIndicator color={C.CRIMSON} size="small" />
+                                        ) : (
+                                            <Icon name="plus" size={14} color={C.CRIMSON} />
+                                        )}
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </View>
+                    )}
 
                     <View style={s.memberList}>
                         {members.map((m, i) => {
@@ -146,11 +267,15 @@ const GroupSettingsScreen: React.FC<Props> = ({
                                     {isAdmin && (
                                         <View style={s.adminBadge}><Icon name="shield" size={12} color={C.CRIMSON} /></View>
                                     )}
-                                    {!isMe && !isAdmin && (
+                                    {canManageGroup && !isMe && !isAdmin && (
                                         <View style={s.actionRow}>
-                                            <TouchableOpacity onPress={() => onPromoteMember?.(m.id)} activeOpacity={0.7} style={s.actionBtn}>
-                                                <Icon name="shield" size={13} color={C.BLUE} />
-                                            </TouchableOpacity>
+                                            {memberActionLoading === m.id ? (
+                                                <View style={s.actionBtn}><ActivityIndicator color={C.BLUE} size="small" /></View>
+                                            ) : (
+                                                <TouchableOpacity onPress={() => handlePromoteMember(m)} activeOpacity={0.7} style={s.actionBtn}>
+                                                    <Icon name="shield" size={13} color={C.BLUE} />
+                                                </TouchableOpacity>
+                                            )}
                                             <TouchableOpacity onPress={() => onRemoveMember?.(m.id)} activeOpacity={0.7} style={s.actionBtn}>
                                                 <Icon name="x" size={13} color={C.CRIMSON} />
                                             </TouchableOpacity>
@@ -195,6 +320,11 @@ const s = StyleSheet.create({
     membersHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     inviteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(220,20,60,0.08)' },
     inviteBtnText: { fontSize: 12, color: C.CRIMSON, fontWeight: '700' },
+    invitePanel: { backgroundColor: C.WHITE, borderRadius: 14, borderWidth: 1, borderColor: C.GRAY200, marginBottom: 12, overflow: 'hidden' },
+    inviteSearch: { fontSize: 14, color: C.GRAY800, fontWeight: '500', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.GRAY100 },
+    inviteHint: { fontSize: 12, color: C.GRAY600, paddingHorizontal: 14, paddingVertical: 14, textAlign: 'center' },
+    inviteResultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14 },
+    inviteResultBorder: { borderBottomWidth: 1, borderBottomColor: C.GRAY100 },
     memberList: { backgroundColor: C.WHITE, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: C.GRAY200 },
     memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14 },
     memberRowBorder: { borderBottomWidth: 1, borderBottomColor: C.GRAY100 },
