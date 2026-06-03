@@ -3,6 +3,19 @@ import { AppUser, authService } from '../services/authService';
 import { biometricService } from '../services/biometricService';
 import { supabase } from '../lib/supabase';
 
+// Fetches avatar_url directly from profiles table.
+// authService.fetchProfile() already tries this, but falls back to a query
+// without avatar_url when the first query errors, so avatarUrl can end up
+// undefined even when the row has the column. This supplements that gap.
+const fetchProfileAvatar = async (userId: string): Promise<string | undefined> => {
+  const { data } = await supabase
+    .from('profiles')
+    .select('avatar_url')
+    .eq('user_id', userId)
+    .single();
+  return data?.avatar_url ?? undefined;
+};
+
 interface LocalSession {
   access_token: string;
   user: AppUser;
@@ -40,6 +53,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const nextSession = await authService.getSession();
+      if (nextSession?.user && !nextSession.user.avatarUrl) {
+        const avatarUrl = await fetchProfileAvatar(nextSession.user.id);
+        if (avatarUrl) nextSession.user = { ...nextSession.user, avatarUrl };
+      }
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
     } finally {
@@ -52,6 +69,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       try {
         const nextSession = await authService.getSession();
+        if (nextSession?.user && !nextSession.user.avatarUrl) {
+          const avatarUrl = await fetchProfileAvatar(nextSession.user.id);
+          if (avatarUrl) nextSession.user = { ...nextSession.user, avatarUrl };
+        }
         if (nextSession) {
           // Existing session on app open — check if biometric lock should apply
           const shouldLock = await biometricService.isEnabled();
@@ -70,6 +91,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN') {
         // Fresh password login — no biometric lock
         const nextSession = await authService.getSession();
+        if (nextSession?.user && !nextSession.user.avatarUrl) {
+          const avatarUrl = await fetchProfileAvatar(nextSession.user.id);
+          if (avatarUrl) nextSession.user = { ...nextSession.user, avatarUrl };
+        }
         setSession(nextSession);
         setUser(nextSession?.user ?? null);
         setLoading(false);
