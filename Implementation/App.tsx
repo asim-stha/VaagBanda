@@ -1,253 +1,312 @@
-import React, { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
-import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { authService } from './src/services/authService';
-import { apiService, Creditor, GroupDetail, GroupSummary } from './src/services/apiService';
 
+import React, { useState } from 'react';
+
+// Auth screens
 import SplashScreen from './src/screens/auth/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
-import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
+
+// Main screens
 import HomeScreen from './src/screens/home/HomeScreen';
 import GroupDetailScreen from './src/screens/groups/GroupDetailScreen';
 import CreateGroupScreen from './src/screens/groups/CreateGroupScreen';
+import GroupSettingsScreen from './src/screens/groups/GroupSettingsScreen';
+import MemberHistoryScreen from './src/screens/groups/MemberHistoryScreen';
+
+// Expense screens
 import AddExpenseScreen from './src/screens/expenses/AddExpenseScreen';
+import ExpenseDetailScreen from './src/screens/expenses/ExpenseDetailScreen';
+import EditExpenseScreen from './src/screens/expenses/EditExpenseScreen';
+import ScanReceiptScreen from './src/screens/expenses/ScanReceiptScreen';
+
+// Settlement
 import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
 
+// Tab screens (rendered inside HomeScreen)
+import ActivityScreen from './src/screens/tabs/ActivityScreen';
+import ProfileScreen from './src/screens/tabs/ProfileScreen';
+
+// Settings & Profile
+import NotificationSettingsScreen from './src/screens/settings/NotificationSettingsScreen';
+import EditProfileScreen from './src/screens/profile/EditProfileScreen';
+
+// Analytics
+import AnalyticsScreen from './src/screens/analytics/AnalyticsScreen';
+import ExportScreen from './src/screens/analytics/ExportScreen';
+
+/* ─── ROUTE TYPES ──────────────────────────────────────────── */
 type Screen =
- | 'splash'
- | 'login'
- | 'signup'
- | 'forgot'
- | 'verify-email'
- | 'home'
- | 'create-group'
- | 'group'
- | 'add-expense'
- | 'settle-up';
+  | 'splash'
+  | 'login'
+  | 'signup'
+  | 'forgot'
+  | 'home'
+  | 'create-group'
+  | 'group'
+  | 'group-settings'
+  | 'member-history'
+  | 'add-expense'
+  | 'expense-detail'
+  | 'edit-expense'
+  | 'settle-up'
+  | 'scan-receipt'
+  | 'notification-settings'
+  | 'edit-profile'
+  | 'analytics'
+  | 'export';
 
 type Tab = 'home' | 'groups' | 'activity' | 'profile';
 
+/* ─── MAIN APP ─────────────────────────────────────────────── */
 export default function App() {
+  const [screen, setScreen] = useState<Screen>('splash');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
+
+  /* ─── AUTH SCREENS ─── */
+
+  if (screen === 'splash') {
+    return <SplashScreen onDone={() => setScreen('login')} />;
+  }
+
+  if (screen === 'signup') {
+    return (
+      <SignupScreen
+        onGoToLogin={() => setScreen('login')}
+        onSignup={(data) => {
+          console.log('Signup:', data);
+          setScreen('home');
+        }}
+        onGoogleSignup={() => console.log('google signup')}
+        onAppleSignup={() => console.log('apple signup')}
+        onOpenTerms={() => console.log('terms')}
+        onOpenPrivacy={() => console.log('privacy')}
+      />
+    );
+  }
+
+  if (screen === 'forgot') {
+    return (
+      <ForgotPasswordScreen
+        onGoToLogin={() => setScreen('login')}
+        onSubmit={async (email) => {
+          console.log('Reset for:', email);
+          await new Promise(r => setTimeout(r, 800));
+        }}
+      />
+    );
+  }
+
+  /* ─── EXPENSE SCREENS ─── */
+
+  if (screen === 'add-expense') {
+    return (
+      <AddExpenseScreen
+        groupName="Pokhara Trip"
+        groupCurrency="NPR"
+        onBack={() => setScreen('group')}
+        onSave={(expense) => {
+          console.log('Expense saved:', expense);
+          setScreen('group');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'expense-detail') {
+    return (
+      <ExpenseDetailScreen
+        onBack={() => setScreen('group')}
+        onEdit={(id) => {
+          setActiveExpenseId(id);
+          setScreen('edit-expense');
+        }}
+        onDelete={(id) => {
+          console.log('Deleted expense:', id);
+          setScreen('group');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'edit-expense') {
+    return (
+      <EditExpenseScreen
+        expenseId={activeExpenseId ?? 'e1'}
+        onBack={() => setScreen('expense-detail')}
+        onSave={(data) => {
+          console.log('Expense updated:', data);
+          setScreen('group');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'scan-receipt') {
+    return (
+      <ScanReceiptScreen
+        onBack={() => setScreen('home')}
+        onCapture={(uri) => {
+          console.log('Receipt captured:', uri);
+          setScreen('add-expense');
+        }}
+        onManualEntry={() => setScreen('add-expense')}
+      />
+    );
+  }
+
+  /* ─── SETTLEMENT ─── */
+
+  if (screen === 'settle-up') {
+    return (
+      <SettleUpScreen
+        groupName="Pokhara Trip"
+        groupCurrency="NPR"
+        onBack={() => setScreen('group')}
+        onSettle={(settlement) => {
+          console.log('Settlement:', settlement);
+        }}
+      />
+    );
+  }
+
+  /* ─── GROUP SCREENS ─── */
+
+  if (screen === 'create-group') {
+    return (
+      <CreateGroupScreen
+        onBack={() => setScreen('home')}
+        onCreate={(group) => {
+          console.log('Group created:', group);
+          setScreen('home');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'group-settings') {
+    return (
+      <GroupSettingsScreen
+        onBack={() => setScreen('group')}
+        onSave={(data) => {
+          console.log('Group settings saved:', data);
+          setScreen('group');
+        }}
+        onInviteMember={() => console.log('invite member')}
+        onRemoveMember={(id) => console.log('remove member:', id)}
+        onPromoteMember={(id) => console.log('promote member:', id)}
+        onDeleteGroup={() => {
+          console.log('group deleted');
+          setScreen('home');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'member-history') {
+    return (
+      <MemberHistoryScreen
+        onBack={() => setScreen('group')}
+      />
+    );
+  }
+
+  if (screen === 'group') {
+    return (
+      <GroupDetailScreen
+        onBack={() => setScreen('home')}
+        onAddExpense={() => setScreen('add-expense')}
+        onSettleUp={() => setScreen('settle-up')}
+        onExpenseTap={(id) => {
+          setActiveExpenseId(id);
+          setScreen('expense-detail');
+        }}
+        onOpenSettings={() => setScreen('group-settings')}
+      />
+    );
+  }
+
+  /* ─── ANALYTICS ─── */
+
+  if (screen === 'analytics') {
+    return (
+      <AnalyticsScreen
+        onBack={() => setScreen('group')}
+        onExport={() => setScreen('export')}
+      />
+    );
+  }
+
+  if (screen === 'export') {
+    return (
+      <ExportScreen
+        onBack={() => setScreen('analytics')}
+        onExport={(format, scope) => {
+          console.log('Export:', format, scope);
+        }}
+      />
+    );
+  }
+
+  /* ─── SETTINGS & PROFILE ─── */
+
+  if (screen === 'notification-settings') {
+    return (
+      <NotificationSettingsScreen
+        onBack={() => setScreen('home')}
+        onSave={(prefs) => console.log('Notification prefs:', prefs)}
+      />
+    );
+  }
+
+  if (screen === 'edit-profile') {
+    return (
+      <EditProfileScreen
+        onBack={() => setScreen('home')}
+        onSave={(data) => {
+          console.log('Profile updated:', data);
+          setScreen('home');
+        }}
+      />
+    );
+  }
+
+  /* ─── HOME (with tab handling) ─── */
+
+  if (screen === 'home') {
+    return (
+      <HomeScreen
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onGroupTap={(id) => {
+          setActiveGroupId(id);
+          setScreen('group');
+        }}
+        onAddExpense={() => setScreen('add-expense')}
+        onScanReceipt={() => setScreen('scan-receipt')}
+        onCreateGroup={() => setScreen('create-group')}
+        onOpenNotifications={() => setActiveTab('activity')}
+      />
+    );
+  }
+
+  /* ─── LOGIN (default) ─── */
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <LoginScreen
+      onLogin={() => {
+        console.log('login');
+        setScreen('home');
+      }}
+      onGoToSignup={() => setScreen('signup')}
+      onForgotPassword={() => setScreen('forgot')}
+      onBiometricLogin={() => {
+        console.log('biometric');
+        setScreen('home');
+      }}
+      onGoogleLogin={() => console.log('google login')}
+      onAppleLogin={() => console.log('apple login')}
+    />
   );
-}
-
-function AppContent() {
- const { user, loading, refreshAuth } = useAuth();
- const [screen, setScreen] = useState<Screen>('splash');
- const [pendingEmail, setPendingEmail] = useState('');
- const [activeTab, setActiveTab] = useState<Tab>('home');
- const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
- const [groups, setGroups] = useState<GroupSummary[]>([]);
- const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null);
- const [creditors, setCreditors] = useState<Creditor[]>([]);
-
- const showError = (error: unknown) => {
-   const message = error instanceof Error ? error.message : 'Something went wrong.';
-   Alert.alert('VaagBanda', message);
- };
-
- const loadGroups = async () => {
-   try {
-     const response = await apiService.getGroups();
-     setGroups(response.data);
-   } catch (error) {
-     showError(error);
-   }
- };
-
- const loadGroup = async (groupId: string) => {
-   try {
-     const [detailResponse, creditorsResponse] = await Promise.all([
-       apiService.getGroup(groupId),
-       apiService.getCreditors(groupId),
-     ]);
-     setGroupDetail(detailResponse.data);
-     setCreditors(creditorsResponse.data);
-   } catch (error) {
-     showError(error);
-   }
- };
-
- useEffect(() => {
-   if (loading) return;
-
-   const authScreens = ['splash', 'login', 'signup', 'forgot', 'verify-email'];
-   if (user) {
-     if (authScreens.includes(screen)) {
-       setScreen('home');
-     }
-     loadGroups();
-   } else if (!authScreens.includes(screen)) {
-     setScreen('login');
-   }
- }, [user, loading]);
-
- if (screen === 'splash') {
-   return React.createElement(SplashScreen, {
-     onDone: () => setScreen(user ? 'home' : 'login'),
-   });
- }
-
- if (screen === 'signup') {
-   return React.createElement(SignupScreen, {
-     onGoToLogin: () => setScreen('login'),
-     onSignup: async (data: any) => {
-       const { needsVerification } = await authService.signUp(data.email, data.password, data.name);
-       if (needsVerification) {
-         setPendingEmail(data.email.trim());
-         setScreen('verify-email');
-       } else {
-         await refreshAuth();
-         await loadGroups();
-         setScreen('home');
-       }
-     },
-     onGoogleSignup: () => Alert.alert('VaagBanda', 'Google signup is not connected yet.'),
-     onAppleSignup: () => Alert.alert('VaagBanda', 'Apple signup is not connected yet.'),
-     onOpenTerms: () => console.log('open terms'),
-     onOpenPrivacy: () => console.log('open privacy'),
-   });
- }
-
- if (screen === 'verify-email') {
-   return React.createElement(VerifyEmailScreen, {
-     email: pendingEmail,
-     onResend: () => authService.resendVerification(pendingEmail),
-     onGoToLogin: () => setScreen('login'),
-   });
- }
-
-if (screen === 'forgot') {
-   return React.createElement(ForgotPasswordScreen, {
-     onGoToLogin: () => setScreen('login'),
-     onSubmit: async (email: string) => {
-       await authService.resetPassword(email);
-     },
-   });
- }
-
- if (screen === 'add-expense') {
-   const activeGroup = groupDetail;
-   return React.createElement(AddExpenseScreen, {
-     groupName: activeGroup?.name || 'Group',
-     groupCurrency: activeGroup?.currency || 'NPR',
-     members: activeGroup?.members,
-     myUserId: activeGroup?.myUserId || user?.id,
-     onBack: () => setScreen('group'),
-     onSave: async (expense: any) => {
-       if (!activeGroupId) return;
-       try {
-         const response = await apiService.addExpense(activeGroupId, expense);
-         setGroupDetail(response.data);
-         await loadGroups();
-         await loadGroup(activeGroupId);
-         setScreen('group');
-       } catch (error) {
-         showError(error);
-       }
-     },
-   });
- }
-
- if (screen === 'settle-up') {
-   const activeGroup = groupDetail;
-   return React.createElement(SettleUpScreen, {
-     groupName: activeGroup?.name || 'Group',
-     groupCurrency: activeGroup?.currency || 'NPR',
-     creditors,
-     onBack: () => setScreen('group'),
-     onSettle: async (settlement: any) => {
-       if (!activeGroupId) return;
-       try {
-         const response = await apiService.recordSettlement(activeGroupId, settlement);
-         setGroupDetail(response.group);
-         await loadGroups();
-         await loadGroup(activeGroupId);
-       } catch (error) {
-         showError(error);
-       }
-     },
-   });
- }
-
- if (screen === 'create-group') {
-   return React.createElement(CreateGroupScreen, {
-     onBack: () => setScreen('home'),
-     onCreate: async (group: any) => {
-       try {
-         const response = await apiService.createGroup(group);
-         await loadGroups();
-         setActiveGroupId(response.data.id);
-         await loadGroup(response.data.id);
-         setScreen('group');
-       } catch (error) {
-         showError(error);
-       }
-     },
-   });
- }
-
- if (screen === 'group') {
-   return React.createElement(GroupDetailScreen, {
-     group: groupDetail || undefined,
-     onBack: () => {
-       setScreen('home');
-       loadGroups();
-     },
-     onAddExpense: () => setScreen('add-expense'),
-     onSettleUp: () => setScreen('settle-up'),
-     onExpenseTap: (expenseId: string) => {
-       console.log('open expense detail', expenseId);
-     },
-     onOpenSettings: () => {
-       console.log('open group settings');
-     },
-   });
- }
-
- if (screen === 'home') {
-   return React.createElement(HomeScreen, {
-     user: user ? { id: user.id, name: user.name, avatarColor: user.avatarColor } : undefined,
-     groups,
-     activeTab: activeTab,
-     onTabChange: setActiveTab,
-     onGroupTap: async (id: string) => {
-       setActiveGroupId(id);
-       setScreen('group');
-       await loadGroup(id);
-     },
-     onAddExpense: async () => {
-       const groupId = activeGroupId || groups[0]?.id;
-       if (!groupId) {
-         Alert.alert('VaagBanda', 'Create a group first.');
-         return;
-       }
-       setActiveGroupId(groupId);
-       await loadGroup(groupId);
-       setScreen('add-expense');
-     },
-     onScanReceipt: () => Alert.alert('VaagBanda', 'Receipt scanning is not connected yet.'),
-     onCreateGroup: () => setScreen('create-group'),
-     onOpenNotifications: () => setActiveTab('activity'),
-   });
- }
-
- return React.createElement(LoginScreen, {
-   onLogin: async () => {
-     await refreshAuth();
-     await loadGroups();
-     setScreen('home');
-   },
-   onGoToSignup: () => setScreen('signup'),
-   onForgotPassword: () => setScreen('forgot'),
-   onBiometricLogin: () => Alert.alert('VaagBanda', 'Biometric login is not connected yet.'),
-   onGoogleLogin: () => Alert.alert('VaagBanda', 'Google login is not connected yet.'),
-   onAppleLogin: () => Alert.alert('VaagBanda', 'Apple login is not connected yet.'),
- });
 }
