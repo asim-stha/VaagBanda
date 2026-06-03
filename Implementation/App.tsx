@@ -84,7 +84,7 @@ interface GroupContext {
 
 /* ─── INNER NAVIGATOR ──────────────────────────────────────── */
 function AppNavigator() {
-  const { user, loading, signOut, biometricLocked, unlockBiometric, enableBiometricLogin } = useAuth();
+  const { user, loading, signOut, refreshAuth, biometricLocked, unlockBiometric, enableBiometricLogin } = useAuth();
   const [screen, setScreen] = useState<Screen>('splash');
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -422,24 +422,44 @@ if (screen === 'scan-receipt') {
   if (screen === 'edit-profile') {
     return (
       <EditProfileScreen
+        avatarUrl={user?.avatarUrl}
         onBack={() => setScreen('home')}
         onSave={async (data) => {
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (!authUser) return;
 
-            // Update profile in database
-            await supabase
-              .from('profiles')
-              .update({
-                full_name: data.name,
-                email: data.email,
-              })
-              .eq('user_id', user.id);
-
-          } catch (e: any) {
-            console.error('Profile update failed:', e.message);
+          let avatarUrl: string | undefined;
+          if (data.avatarUri && !data.avatarUri.startsWith('http')) {
+            try {
+              const response = await fetch(data.avatarUri);
+              const blob = await response.blob();
+              const ext = data.avatarUri.split('.').pop()?.split('?')[0] ?? 'jpg';
+              const filePath = `${authUser.id}/avatar.${ext}`;
+              const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, blob, {
+                  contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+                  upsert: true,
+                });
+              if (!uploadError) {
+                const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+                avatarUrl = urlData.publicUrl;
+              }
+            } catch (e: any) {
+              console.error('Avatar upload failed:', e.message);
+            }
           }
+
+          await supabase
+            .from('profiles')
+            .update({
+              full_name: data.name,
+              email: data.email,
+              ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+            })
+            .eq('user_id', authUser.id);
+
+          await refreshAuth();
           setScreen('home');
         }}
       />
