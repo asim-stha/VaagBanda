@@ -24,6 +24,7 @@ import AddExpenseScreen from './src/screens/expenses/AddExpenseScreen';
 import ExpenseDetailScreen from './src/screens/expenses/ExpenseDetailScreen';
 import EditExpenseScreen from './src/screens/expenses/EditExpenseScreen';
 import ScanReceiptScreen from './src/screens/expenses/ScanReceiptScreen';
+import SelectGroupScreen from './src/screens/expenses/SelectGroupScreen';
 
 // Settlement
 import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
@@ -57,6 +58,7 @@ type Screen =
   | 'edit-expense'
   | 'settle-up'
   | 'scan-receipt'
+  | 'select-group'
   | 'notification-settings'
   | 'edit-profile'
   | 'analytics'
@@ -149,6 +151,18 @@ function AppNavigator() {
   }
 
   /* ─── EXPENSE SCREENS ─── */
+
+  if (screen === 'select-group') {
+    return (
+      <SelectGroupScreen
+        onBack={() => setScreen('home')}
+        onSelectGroup={(info) => {
+          setGroupContext(info);
+          setScreen('add-expense');
+        }}
+      />
+    );
+  }
 
   if (screen === 'add-expense') {
     return (
@@ -355,7 +369,10 @@ function AppNavigator() {
           setActiveGroupId(id);
           setScreen('group');
         }}
-        onAddExpense={() => setScreen('add-expense')}
+        onAddExpense={() => {
+          setGroupContext(null);
+          setScreen('select-group');
+        }}
         onScanReceipt={() => setScreen('scan-receipt')}
         onCreateGroup={() => setScreen('create-group')}
         onOpenNotifications={() => setActiveTab('activity')}
