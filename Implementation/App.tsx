@@ -448,6 +448,9 @@ if (screen === 'scan-receipt') {
             } catch (e: any) {
               console.error('Avatar upload failed:', e.message);
             }
+          } else if (data.avatarUri?.startsWith('http')) {
+            // EditProfileScreen already uploaded; strip cache-bust param before saving to DB
+            avatarUrl = data.avatarUri.split('?')[0];
           }
 
           await supabase
@@ -460,6 +463,7 @@ if (screen === 'scan-receipt') {
             .eq('user_id', authUser.id);
 
           await refreshAuth();
+          setRefreshKey(k => k + 1);
           setScreen('home');
         }}
       />
