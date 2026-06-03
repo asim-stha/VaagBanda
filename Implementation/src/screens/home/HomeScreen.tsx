@@ -10,9 +10,12 @@ import {
   StatusBar,
   Image,
   Linking,
+  TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { apiService, GroupSummary } from '../../services/apiService';
+import { apiService, FriendSummary, GroupSummary } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
 import { useAuth } from '../../context/AuthContext';
@@ -36,7 +39,7 @@ const COLORS = {
 
 /* ─── ICONS ────────────────────────────────────────────────── */
 type IconName =
-  | 'home' | 'groups' | 'activity' | 'profile'
+  | 'home' | 'friends' | 'groups' | 'activity' | 'profile'
   | 'plus' | 'scan' | 'addGroup' | 'bell' | 'chevron';
 
 const Icon = ({
@@ -67,6 +70,14 @@ const Icon = ({
       return (
         <Svg {...props}>
           <Polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </Svg>
+      );
+    case 'friends':
+      return (
+        <Svg {...props}>
+          <Circle cx="9" cy="9" r="3" />
+          <Circle cx="15" cy="15" r="3" />
+          <Path d="M2 21c2-2 4-3 7-3s5 1 7 3" />
         </Svg>
       );
     case 'profile':
@@ -157,8 +168,8 @@ interface HomeScreenProps {
   onScanReceipt?: () => void;
   onCreateGroup?: () => void;
   onOpenNotifications?: () => void;
-  onTabChange?: (tab: 'home' | 'groups' | 'activity' | 'profile') => void;
-  activeTab?: 'home' | 'groups' | 'activity' | 'profile';
+  onTabChange?: (tab: 'home' | 'friends' | 'groups' | 'activity' | 'profile') => void;
+  activeTab?: 'home' | 'friends' | 'groups' | 'activity' | 'profile';
   hasUnreadNotifications?: boolean;
   onNotificationSettings?: () => void;
   onEditProfile?: () => void;
@@ -217,12 +228,13 @@ const TabBar = ({
   onTabChange,
   hasUnread = false,
 }: {
-  active?: 'home' | 'groups' | 'activity' | 'profile';
-  onTabChange?: (tab: 'home' | 'groups' | 'activity' | 'profile') => void;
+  active?: 'home' | 'friends' | 'groups' | 'activity' | 'profile';
+  onTabChange?: (tab: 'home' | 'friends' | 'groups' | 'activity' | 'profile') => void;
   hasUnread?: boolean;
 }) => {
-  const tabs: { key: 'home' | 'groups' | 'activity' | 'profile'; label: string; icon: IconName }[] = [
+  const tabs: { key: 'home' | 'friends' | 'groups' | 'activity' | 'profile'; label: string; icon: IconName }[] = [
     { key: 'home', label: 'Home', icon: 'home' },
+    { key: 'friends', label: 'Friends', icon: 'friends' },
     { key: 'groups', label: 'Groups', icon: 'groups' },
     { key: 'activity', label: 'Activity', icon: 'activity' },
     { key: 'profile', label: 'Profile', icon: 'profile' },
@@ -277,12 +289,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const { signOut, user: authUser } = useAuth();
   const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [friends, setFriends] = useState<FriendSummary[]>([]);
+  const [friendQuery, setFriendQuery] = useState('');
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
 
   useEffect(() => {
     apiService.getGroups()
       .then(({ data }) => setGroups(data))
       .catch(() => setGroups([]));
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (activeTab !== 'friends') return;
+
+    setLoadingFriends(true);
+    apiService.getFriends()
+      .then(({ data }) => setFriends(data))
+      .catch(() => setFriends([]))
+      .finally(() => setLoadingFriends(false));
+  }, [activeTab, refreshKey]);
 
   const displayUser = useMemo(() => {
     const id = authUser?.id || '';
@@ -307,6 +333,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     if (h < 12) return 'Good morning';
     if (h < 17) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  const selectedFriend = friends.find(f => f.id === selectedFriendId);
+  const filteredFriends = useMemo(() => {
+    const query = friendQuery.trim().toLowerCase();
+    if (!query) return friends;
+    return friends.filter(f => f.name.toLowerCase().includes(query));
+  }, [friends, friendQuery]);
+
+  const friendBalanceStats = useMemo(() => {
+    const owesYou = friends.filter(f => f.totalBalance > 0).reduce((s, f) => s + f.totalBalance, 0);
+    const youOwe = friends.filter(f => f.totalBalance < 0).reduce((s, f) => s + f.totalBalance, 0);
+    return { owesYou: round2(owesYou), youOwe: round2(youOwe) };
+  }, [friends]);
+
+  const handleRemoveFriendFromGroup = async (friendId: string, groupId: string) => {
+    try {
+      await apiService.removeGroupMember(groupId, friendId);
+      Alert.alert('Removed', 'Friend was removed from the group.');
+      setSelectedFriendId(null);
+      setLoadingFriends(true);
+      const { data } = await apiService.getFriends();
+      setFriends(data);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Unable to remove friend from group');
+    } finally {
+      setLoadingFriends(false);
+    }
   };
 
   const renderContent = () => {

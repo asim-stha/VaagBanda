@@ -43,6 +43,24 @@ export interface GroupDetail {
   expenses: GroupExpense[];
 }
 
+export interface FriendGroupInfo {
+  groupId: string;
+  groupName: string;
+  currency: string;
+  balance: number;
+  canRemove: boolean;
+}
+
+export interface FriendSummary {
+  id: string;
+  name: string;
+  avatarColor: string;
+  groups: FriendGroupInfo[];
+  totalBalance: number;
+  totalSettled: number;
+  totalUnsettled: number;
+}
+
 export interface ProfileSearchResult {
   id: string;
   name: string;
@@ -128,8 +146,21 @@ async function getCurrentUserId(): Promise<string> {
   return user.id;
 }
 
-async function requireGroupAdmin(groupId: string): Promise<string> {
+async function requireGroupMember(groupId: string): Promise<string> {
   const userId = await getCurrentUserId();
+  const { data: membership, error } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !membership) throw new Error('You are not a member of this group');
+  return userId;
+}
+
+async function requireGroupAdmin(groupId: string): Promise<string> {
+  const userId = await requireGroupMember(groupId);
   const { data: membership, error } = await supabase
     .from('group_members')
     .select('role')
@@ -303,7 +334,7 @@ export const apiService = {
   },
 
   async addGroupMember(groupId: string, userIdToAdd: string): Promise<{ data: GroupDetail }> {
-    await requireGroupAdmin(groupId);
+    await requireGroupMember(groupId);
 
     const { data: existing } = await supabase
       .from('group_members')
@@ -767,6 +798,99 @@ export const apiService = {
     }
 
     return { data: { groupCount: groupIds.length, expenseCount, netBalance: round2(netBalance) } };
+  },
+
+  async getFriends(): Promise<{ data: FriendSummary[] }> {
+    const userId = await getCurrentUserId();
+
+    const { data: memberRows, error: mErr } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', userId);
+    if (mErr) throw new Error(mErr.message);
+
+    const groupIds = (memberRows || []).map((r: any) => r.group_id);
+    if (!groupIds.length) return { data: [] };
+
+    const { data: groups, error: gErr } = await supabase
+      .from('groups')
+      .select(`group_id, group_name, default_currency,
+        group_members(user_id, role, profiles(user_id, full_name, avatar_color)),
+        expenses(expense_id, paid_by, amount, expense_splits(user_id, amount_owed)),
+        settlements(payer_id, payee_id, amount)`)
+      .in('group_id', groupIds);
+    if (gErr) throw new Error(gErr.message);
+
+    const friendsMap = new Map<string, FriendSummary>();
+
+    for (const g of (groups || [])) {
+      const groupMembers = (g.group_members || []) as any[];
+      const allExpenses: DbExpense[] = (g.expenses || []).map((e: any) => ({ ...e, expense_splits: e.expense_splits || [] }));
+      const allSettlements: DbSettlement[] = (g.settlements || []).map((s: any) => ({ ...s, created_at: s.created_at || '' }));
+      const currentUserRole = groupMembers.find(m => m.user_id === userId)?.role;
+
+      for (const member of groupMembers) {
+        if (member.user_id === userId) continue;
+        const friendId = member.user_id;
+        const profile = member.profiles || { user_id: member.user_id, full_name: 'Friend', avatar_color: avatarColorFromId(friendId) };
+        const existing = friendsMap.get(friendId);
+        const friendSummary: FriendSummary = existing || {
+          id: friendId,
+          name: profile.full_name || 'Friend',
+          avatarColor: profile.avatar_color || avatarColorFromId(friendId),
+          groups: [],
+          totalBalance: 0,
+          totalSettled: 0,
+          totalUnsettled: 0,
+        };
+
+        let groupBalance = 0;
+        let groupSettled = 0;
+
+        for (const exp of allExpenses) {
+          if (exp.paid_by === userId) {
+            const friendSplit = exp.expense_splits?.find(s => s.user_id === friendId);
+            if (friendSplit) groupBalance += Number(friendSplit.amount_owed);
+          }
+          if (exp.paid_by === friendId) {
+            const mySplit = exp.expense_splits?.find(s => s.user_id === userId);
+            if (mySplit) groupBalance -= Number(mySplit.amount_owed);
+          }
+        }
+
+        for (const s of allSettlements) {
+          if (s.payer_id === friendId && s.payee_id === userId) {
+            groupBalance += Number(s.amount);
+            groupSettled += Number(s.amount);
+          }
+          if (s.payer_id === userId && s.payee_id === friendId) {
+            groupBalance -= Number(s.amount);
+            groupSettled += Number(s.amount);
+          }
+        }
+
+        const groupInfo = {
+          groupId: g.group_id,
+          groupName: g.group_name,
+          currency: g.default_currency || 'NPR',
+          balance: round2(groupBalance),
+          canRemove: currentUserRole === 'admin',
+        };
+
+        friendSummary.groups.push(groupInfo);
+        friendSummary.totalBalance = round2(friendSummary.totalBalance + groupInfo.balance);
+        friendSummary.totalSettled = round2(friendSummary.totalSettled + groupSettled);
+        friendSummary.totalUnsettled = Math.abs(friendSummary.totalBalance);
+        friendsMap.set(friendId, friendSummary);
+      }
+    }
+
+    return {
+      data: Array.from(friendsMap.values()).sort((a, b) => {
+        const diff = Math.abs(b.totalBalance) - Math.abs(a.totalBalance);
+        return diff !== 0 ? diff : a.name.localeCompare(b.name);
+      }),
+    };
   },
 
   async getMemberHistory(groupId: string, memberId: string): Promise<{ data: MemberTransaction[] }> {

@@ -58,6 +58,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
     const [members, setMembers] = useState<Member[]>(membersProp);
     const [currentUserId, setCurrentUserId] = useState(myUserId);
     const currentMember = members.find(m => m.id === currentUserId);
+    const canInvite = !!currentMember;
     const canManageGroup = currentMember?.role === 'admin';
     const canDeleteGroup = canManageGroup;
     const [loadingGroup, setLoadingGroup] = useState(!!groupId && !membersProp.length);
@@ -195,7 +196,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
 
                     <View style={s.membersHeader}>
                         <Text style={s.label}>MEMBERS ({members.length})</Text>
-                        {canManageGroup && (
+                        {canInvite && (
                             <TouchableOpacity
                                 onPress={() => {
                                     setShowInvite(v => !v);
@@ -210,7 +211,7 @@ const GroupSettingsScreen: React.FC<Props> = ({
                         )}
                     </View>
 
-                    {canManageGroup && showInvite && (
+                    {canInvite && showInvite && (
                         <View style={s.invitePanel}>
                             <TextInput
                                 value={inviteQuery}
