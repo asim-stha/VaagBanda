@@ -17,7 +17,9 @@ import {
     ScrollView,
     TouchableOpacity,
     Image,
+    Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { apiService } from '../../services/apiService';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
@@ -106,6 +108,16 @@ interface ProfileScreenProps {
     onLogout?: () => void;
 }
 
+/* ─── CURRENCIES ───────────────────────────────────────────── */
+const CURRENCIES = [
+    { code: 'NPR', label: 'Nepalese Rupee' },
+    { code: 'USD', label: 'US Dollar' },
+    { code: 'EUR', label: 'Euro' },
+    { code: 'INR', label: 'Indian Rupee' },
+    { code: 'KRW', label: 'Korean Won' },
+    { code: 'JPY', label: 'Japanese Yen' },
+];
+
 /* ─── SETTINGS ROW ─────────────────────────────────────────── */
 const SettingsRow = ({
     icon, label, value, onPress, isLast = false,
@@ -135,16 +147,33 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onLogout,
 }) => {
     const [stats, setStats] = useState({ groupCount: 0, expenseCount: 0, netBalance: 0 });
+    const [defaultCurrency, setDefaultCurrency] = useState('NPR');
+    const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
     useEffect(() => {
         apiService.getProfileStats()
             .then(({ data }) => setStats(data))
             .catch(() => {});
+            
+        AsyncStorage.getItem('default_currency').then((val) => {
+            if (val) setDefaultCurrency(val);
+        });
     }, []);
+
+    const handleSelectCurrency = async (code: string) => {
+        setDefaultCurrency(code);
+        setShowCurrencyModal(false);
+        try {
+            await AsyncStorage.setItem('default_currency', code);
+        } catch (err) {
+            console.error('Failed to save currency', err);
+        }
+    };
+
     const settingsItems: (SettingsItem & { isLast?: boolean })[] = [
         { icon: '👤', label: 'Edit Profile', onPress: onEditProfile },
         { icon: '🔔', label: 'Notification Preferences', onPress: onNotificationPrefs },
-        { icon: '💱', label: 'Default Currency', value: 'NPR', onPress: onDefaultCurrency },
+        { icon: '💱', label: 'Default Currency', value: defaultCurrency, onPress: () => setShowCurrencyModal(true) },
         { icon: '🔒', label: 'Security & Privacy', onPress: onSecurityPrivacy },
         { icon: 'ℹ️', label: 'About VaagBanda', onPress: onAbout, isLast: true },
     ];
@@ -239,6 +268,47 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     Made with ❤️ by Team CyberSquadNp
                 </Text>
             </ScrollView>
+
+            {/* CURRENCY MODAL */}
+            <Modal
+                visible={showCurrencyModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowCurrencyModal(false)}
+            >
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => setShowCurrencyModal(false)}
+                    style={styles.modalBackdrop}
+                >
+                    <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>Choose Default Currency</Text>
+                        {CURRENCIES.map((c, idx) => {
+                            const isSelected = c.code === defaultCurrency;
+                            return (
+                                <TouchableOpacity
+                                    key={c.code}
+                                    onPress={() => handleSelectCurrency(c.code)}
+                                    style={[
+                                        styles.currencyRow,
+                                        idx !== CURRENCIES.length - 1 && styles.currencyRowBorder
+                                    ]}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.currencyInfo}>
+                                        <Text style={[styles.currencyCode, isSelected && { color: COLORS.CRIMSON }]}>
+                                            {c.code}
+                                        </Text>
+                                        <Text style={styles.currencyLabelModal}>{c.label}</Text>
+                                    </View>
+                                    {isSelected && <Text style={{ fontSize: 16 }}>✅</Text>}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </View>
     );
 };
@@ -447,6 +517,62 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: COLORS.GRAY400,
         marginTop: 16,
+    },
+
+    /* MODAL */
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15,38,64,0.6)',
+        justifyContent: 'flex-end',
+    },
+    modalSheet: {
+        backgroundColor: COLORS.WHITE,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        paddingHorizontal: 22,
+        paddingTop: 16,
+        paddingBottom: 32,
+    },
+    modalHandle: {
+        width: 40,
+        height: 5,
+        backgroundColor: COLORS.GRAY200,
+        borderRadius: 3,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS.GRAY800,
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    currencyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+    },
+    currencyRowBorder: {
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.GRAY100,
+    },
+    currencyInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    currencyCode: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.GRAY800,
+        width: 40,
+    },
+    currencyLabelModal: {
+        fontSize: 14,
+        color: COLORS.GRAY600,
+        fontWeight: '500',
     },
 });
 

@@ -11,6 +11,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -185,6 +186,12 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
   const [currentUserId, setCurrentUserId] = useState('');
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('default_currency').then(val => {
+      if (val) setCurrency(val);
+    });
+  }, []);
 
   useEffect(() => {
     (async () => {
