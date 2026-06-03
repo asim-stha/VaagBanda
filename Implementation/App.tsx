@@ -1,13 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { authService } from './src/services/authService';
 import { apiService } from './src/services/apiService';
+import { biometricService } from './src/services/biometricService';
 
 // Auth screens
 import SplashScreen from './src/screens/auth/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
+import BiometricLockScreen from './src/screens/auth/BiometricLockScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
@@ -65,7 +68,8 @@ type Screen =
   | 'security-privacy'
   | 'edit-profile'
   | 'analytics'
-  | 'export';
+  | 'export'
+  | 'biometric-lock';
 
 type Tab = 'home' | 'friends' | 'groups' | 'activity' | 'profile';
 
@@ -80,7 +84,7 @@ interface GroupContext {
 
 /* ─── INNER NAVIGATOR ──────────────────────────────────────── */
 function AppNavigator() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, biometricLocked, unlockBiometric, enableBiometricLogin } = useAuth();
   const [screen, setScreen] = useState<Screen>('splash');
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -97,16 +101,32 @@ function AppNavigator() {
   useEffect(() => {
     if (!loading) {
       if (user) {
-        setScreen('home');
+        setScreen(biometricLocked ? 'biometric-lock' : 'home');
       } else {
         setScreen('login');
       }
     }
-  }, [user, loading]);
+  }, [user, loading, biometricLocked]);
 
   /* ─── SPLASH shown while auth loads ─── */
   if (screen === 'splash' || loading) {
     return <SplashScreen onDone={() => {}} />;
+  }
+
+  /* ─── BIOMETRIC LOCK ─── */
+  if (screen === 'biometric-lock') {
+    return (
+      <BiometricLockScreen
+        userName={user?.name ?? ''}
+        onUnlocked={async () => {
+          const success = await unlockBiometric();
+          if (!success) throw new Error('failed');
+        }}
+        onUsePassword={async () => {
+          await signOut();
+        }}
+      />
+    );
   }
 
   /* ─── AUTH SCREENS ─── */
@@ -462,12 +482,41 @@ function AppNavigator() {
   /* ─── LOGIN (default fallback) ─── */
   return (
     <LoginScreen
-      onLogin={() => {
-        // Navigation handled automatically by useEffect when session is detected
+      onLogin={async () => {
+        // After successful password login, offer to enable biometrics if not yet set up
+        const available = await biometricService.isAvailable();
+        const alreadyEnabled = await biometricService.isEnabled();
+        if (available && !alreadyEnabled) {
+          Alert.alert(
+            'Enable Biometric Login',
+            'Use Face ID or Fingerprint to unlock the app next time?',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              {
+                text: 'Enable',
+                onPress: () => enableBiometricLogin(),
+              },
+            ],
+          );
+        }
       }}
       onGoToSignup={() => setScreen('signup')}
       onForgotPassword={() => setScreen('forgot')}
-      onBiometricLogin={() => console.log('biometric — not implemented')}
+      onBiometricLogin={async () => {
+        const enabled = await biometricService.isEnabled();
+        if (!enabled) {
+          Alert.alert(
+            'Biometric Login Unavailable',
+            'Please log in with your password first to set up biometric login.',
+          );
+          return;
+        }
+        // Biometric is enabled but session is gone — just guide them to password
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please log in with your password to continue.',
+        );
+      }}
       onGoogleLogin={() => console.log('google login — not implemented')}
       onAppleLogin={() => console.log('apple login — not implemented')}
     />
