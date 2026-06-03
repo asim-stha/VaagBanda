@@ -1,15 +1,4 @@
-/**
- * VaagBanda — ProfileScreen.tsx
- * User profile and settings — matching the mockup exactly.
- *
- * Maps to SRS §3.1 (Profile tab: user settings and preferences)
- * Renders as a tab view inside HomeScreen.
- *
- * ─── Required dependencies ───
- *   npx expo install expo-linear-gradient react-native-svg
- */
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -19,11 +8,14 @@ import {
     Image,
     Modal,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { apiService } from '../../services/apiService';
-import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import Svg, { Path, Line, Polyline } from 'react-native-svg';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
 const COLORS = {
@@ -53,11 +45,7 @@ const Icon = ({
     };
     switch (name) {
         case 'chevron':
-            return (
-                <Svg {...props}>
-                    <Polyline points="9 18 15 12 9 6" />
-                </Svg>
-            );
+            return <Svg {...props}><Polyline points="9 18 15 12 9 6" /></Svg>;
         case 'logout':
             return (
                 <Svg {...props}>
@@ -70,18 +58,55 @@ const Icon = ({
     }
 };
 
+// Module-level cache keyed by userId — survives tab switches (unmount/remount)
+// without re-fetching. Invalidates automatically when a different user signs in.
+let _avatarCache: { userId: string; url: string } | null = null;
+
 /* ─── AVATAR ───────────────────────────────────────────────── */
-const Avatar = ({
+const Avatar = React.memo(({
     name, color, size = 64, imageUrl,
-}: { name: string; color: string; size?: number; imageUrl?: string }) => {
-    if (imageUrl) {
+}: { name: string; color: string; size?: number; imageUrl?: string | null }) => {
+    // displayUrl: what is actually visible. Only advances to a new value after
+    // the new Image's onLoad fires — prevents any blank flash during transitions.
+    const [displayUrl, setDisplayUrl] = useState<string | null>(imageUrl ?? null);
+    const pending = !!imageUrl && imageUrl !== displayUrl;
+
+    if (imageUrl || displayUrl) {
         return (
-            <Image
-                source={{ uri: imageUrl }}
-                style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
-            />
+            <View style={[styles.avatarImgWrap, {
+                width: size, height: size, borderRadius: size / 2,
+                overflow: 'hidden', backgroundColor: color,
+                justifyContent: 'center', alignItems: 'center',
+            }]}>
+                {displayUrl ? (
+                    <Image source={{ uri: displayUrl }} style={{ width: size, height: size }} />
+                ) : (
+                    // No displayUrl yet (first load) — show letter while image arrives
+                    <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
+                        {name.charAt(0).toUpperCase()}
+                    </Text>
+                )}
+
+                {/* Preload incoming URL at opacity 0; swap displayUrl only on success */}
+                {pending && (
+                    <Image
+                        source={{ uri: imageUrl! }}
+                        style={[StyleSheet.absoluteFillObject, { opacity: 0 }]}
+                        onLoad={() => setDisplayUrl(imageUrl!)}
+                        onError={() => setDisplayUrl(imageUrl!)}
+                    />
+                )}
+
+                {/* Spinner on top of the existing image while new one loads */}
+                {pending && (
+                    <View style={[StyleSheet.absoluteFillObject, styles.avatarOverlay]}>
+                        <ActivityIndicator size="small" color={COLORS.WHITE} />
+                    </View>
+                )}
+            </View>
         );
     }
+
     return (
         <View style={[styles.avatar, {
             width: size, height: size, borderRadius: size / 2, backgroundColor: color,
@@ -91,7 +116,7 @@ const Avatar = ({
             </Text>
         </View>
     );
-};
+});
 
 /* ─── TYPES ────────────────────────────────────────────────── */
 interface UserInfo {
@@ -107,7 +132,6 @@ interface SettingsItem {
     value?: string;
     onPress?: () => void;
 }
-
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface ProfileScreenProps {
@@ -129,7 +153,6 @@ const CURRENCIES = [
     { code: 'KRW', label: 'Korean Won' },
     { code: 'JPY', label: 'Japanese Yen' },
 ];
-
 
 /* ─── SETTINGS ROW ─────────────────────────────────────────── */
 const SettingsRow = ({
@@ -159,15 +182,61 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onAbout,
     onLogout,
 }) => {
+    const { user: authUser } = useAuth();
     const [stats, setStats] = useState({ groupCount: 0, expenseCount: 0, netBalance: 0 });
     const [defaultCurrency, setDefaultCurrency] = useState('NPR');
     const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+    // avatarUrlRef persists across re-renders without triggering extra fetches.
+    // Seed it from the module-level cache (survives tab switches) if the cached
+    // entry belongs to the current user, otherwise fall back to authUser.
+    const cachedForUser = _avatarCache?.userId === authUser?.id ? _avatarCache.url : null;
+    const avatarUrlRef = useRef<string | null>(cachedForUser ?? authUser?.avatarUrl ?? null);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(avatarUrlRef.current);
+
+    // Sync whenever AuthContext delivers a fresh avatarUrl (e.g. after refreshAuth
+    // following an upload). A one-time ?t= bust is added here — computed once in
+    // the effect, stored in state, and never recalculated during render.
+    useEffect(() => {
+        const incoming = authUser?.avatarUrl;
+        if (!incoming) return;
+        const base = incoming.split('?')[0];
+        const busted = `${base}?t=${Date.now()}`;
+        if (busted === avatarUrlRef.current) return;
+        _avatarCache = { userId: authUser!.id, url: busted };
+        avatarUrlRef.current = busted;
+        setAvatarUrl(busted);
+    }, [authUser?.avatarUrl]);
+
+    // Fallback: if AuthContext still hasn't populated avatarUrl (e.g. column
+    // name mismatch caused fetchProfile to return undefined), do a single direct
+    // DB fetch on mount. Guarded by the ref so it never runs more than once
+    // per user session regardless of how many times the tab is focused.
+    useEffect(() => {
+        if (avatarUrlRef.current) return;
+        let cancelled = false;
+        (async () => {
+            const { data: { user: supaUser } } = await supabase.auth.getUser();
+            if (!supaUser || cancelled) return;
+            const { data } = await supabase
+                .from('profiles')
+                .select('avatar_url')
+                .eq('user_id', supaUser.id)
+                .single();
+            if (!cancelled && data?.avatar_url) {
+                const busted = `${data.avatar_url.split('?')[0]}?t=${Date.now()}`;
+                _avatarCache = { userId: supaUser.id, url: busted };
+                avatarUrlRef.current = busted;
+                setAvatarUrl(busted);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [authUser?.id]);
 
     useEffect(() => {
         apiService.getProfileStats()
             .then(({ data }) => setStats(data))
             .catch(() => {});
-            
         AsyncStorage.getItem('default_currency').then((val) => {
             if (val) setDefaultCurrency(val);
         });
@@ -194,35 +263,27 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     return (
         <View style={styles.root}>
-            <ScrollView
-                contentContainerStyle={{ paddingBottom: 30 }}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Header — diagonal crimson/navy gradient (matches mockup) */}
+            <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
                 <LinearGradient
                     colors={[COLORS.BLUE_DARK, COLORS.CRIMSON_DARK]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.header}
                 >
-                    {/* Decorative blob */}
                     <View style={styles.blob} />
-
-                    <Avatar name={user?.name || 'User'} color={user?.avatarColor || COLORS.CRIMSON} size={72} imageUrl={user?.avatarUrl} />
+                    <Avatar
+                        name={user?.name || 'User'}
+                        color={user?.avatarColor || COLORS.CRIMSON}
+                        size={72}
+                        imageUrl={avatarUrl}
+                    />
                     <Text style={styles.headerName}>{user?.name || 'User'}</Text>
                     <Text style={styles.headerEmail}>{user?.email || ''}</Text>
-
-                    {/* Edit profile pill */}
-                    <TouchableOpacity
-                        onPress={onEditProfile}
-                        activeOpacity={0.7}
-                        style={styles.editPill}
-                    >
+                    <TouchableOpacity onPress={onEditProfile} activeOpacity={0.7} style={styles.editPill}>
                         <Text style={styles.editPillText}>Edit Profile</Text>
                     </TouchableOpacity>
                 </LinearGradient>
 
-                {/* Stats row */}
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={styles.statNumber}>{stats.groupCount}</Text>
@@ -242,19 +303,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </View>
                 </View>
 
-                {/* Settings list */}
                 <View style={styles.settingsCard}>
                     <Text style={styles.settingsHeader}>SETTINGS</Text>
                     {settingsItems.map((item, idx) => (
-                        <SettingsRow
-                            key={item.label}
-                            {...item}
-                            isLast={idx === settingsItems.length - 1}
-                        />
+                        <SettingsRow key={item.label} {...item} isLast={idx === settingsItems.length - 1} />
                     ))}
                 </View>
 
-                {/* App version */}
                 <View style={styles.versionCard}>
                     <Image
                         source={require('../../../assets/logo/vaagbanda-logo.png')}
@@ -262,28 +317,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         resizeMode="contain"
                     />
                     <Text style={styles.versionText}>VaagBanda v1.0.0</Text>
-                    <Text style={styles.versionSub}>
-                        Scan · Split · Settle
-                    </Text>
+                    <Text style={styles.versionSub}>Scan · Split · Settle</Text>
                 </View>
 
-                {/* Sign out button */}
-                <TouchableOpacity
-                    onPress={onLogout}
-                    activeOpacity={0.85}
-                    style={styles.logoutBtn}
-                >
+                <TouchableOpacity onPress={onLogout} activeOpacity={0.85} style={styles.logoutBtn}>
                     <Icon name="logout" size={18} color={COLORS.CRIMSON} />
                     <Text style={styles.logoutText}>Sign Out</Text>
                 </TouchableOpacity>
 
-                {/* Footer credit */}
-                <Text style={styles.footer}>
-                    Made with ❤️ by Team CyberSquadNp
-                </Text>
+                <Text style={styles.footer}>Made with ❤️ by Team CyberSquadNp</Text>
             </ScrollView>
 
-            {/* CURRENCY MODAL */}
             <Modal
                 visible={showCurrencyModal}
                 transparent
@@ -304,16 +348,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 <TouchableOpacity
                                     key={c.code}
                                     onPress={() => handleSelectCurrency(c.code)}
-                                    style={[
-                                        styles.currencyRow,
-                                        idx !== CURRENCIES.length - 1 && styles.currencyRowBorder
-                                    ]}
+                                    style={[styles.currencyRow, idx !== CURRENCIES.length - 1 && styles.currencyRowBorder]}
                                     activeOpacity={0.7}
                                 >
                                     <View style={styles.currencyInfo}>
-                                        <Text style={[styles.currencyCode, isSelected && { color: COLORS.CRIMSON }]}>
-                                            {c.code}
-                                        </Text>
+                                        <Text style={[styles.currencyCode, isSelected && { color: COLORS.CRIMSON }]}>{c.code}</Text>
                                         <Text style={styles.currencyLabelModal}>{c.label}</Text>
                                     </View>
                                     {isSelected && <Text style={{ fontSize: 16 }}>✅</Text>}
@@ -323,7 +362,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
-
         </View>
     );
 };
@@ -376,6 +414,15 @@ const styles = StyleSheet.create({
     },
 
     /* AVATAR */
+    avatarImgWrap: {
+        borderWidth: 3,
+        borderColor: 'rgba(255,255,255,0.30)',
+    },
+    avatarOverlay: {
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     avatar: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -403,10 +450,7 @@ const styles = StyleSheet.create({
         elevation: 4,
         zIndex: 2,
     },
-    statItem: {
-        flex: 1,
-        alignItems: 'center',
-    },
+    statItem: { flex: 1, alignItems: 'center' },
     statNumber: {
         fontSize: 20,
         fontWeight: '800',
@@ -460,51 +504,16 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: COLORS.GRAY100,
     },
-    settingsIcon: {
-        fontSize: 20,
-        marginRight: 14,
-    },
-    settingsLabel: {
-        flex: 1,
-        fontSize: 14,
-        color: COLORS.GRAY800,
-        fontWeight: '600',
-    },
-    settingsRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    settingsValue: {
-        fontSize: 12,
-        color: COLORS.GRAY400,
-        fontWeight: '600',
-    },
+    settingsIcon: { fontSize: 20, marginRight: 14 },
+    settingsLabel: { flex: 1, fontSize: 14, color: COLORS.GRAY800, fontWeight: '600' },
+    settingsRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    settingsValue: { fontSize: 12, color: COLORS.GRAY400, fontWeight: '600' },
 
     /* VERSION CARD */
-    versionCard: {
-        alignItems: 'center',
-        marginTop: 24,
-        paddingHorizontal: 20,
-    },
-    versionLogo: {
-        width: 50,
-        height: 56,
-        opacity: 0.5,
-    },
-    versionText: {
-        fontSize: 12,
-        color: COLORS.GRAY400,
-        fontWeight: '700',
-        marginTop: 6,
-    },
-    versionSub: {
-        fontSize: 10,
-        color: COLORS.GRAY400,
-        letterSpacing: 2,
-        marginTop: 2,
-        textTransform: 'uppercase',
-    },
+    versionCard: { alignItems: 'center', marginTop: 24, paddingHorizontal: 20 },
+    versionLogo: { width: 50, height: 56, opacity: 0.5 },
+    versionText: { fontSize: 12, color: COLORS.GRAY400, fontWeight: '700', marginTop: 6 },
+    versionSub: { fontSize: 10, color: COLORS.GRAY400, letterSpacing: 2, marginTop: 2, textTransform: 'uppercase' },
 
     /* LOGOUT */
     logoutBtn: {
@@ -520,19 +529,10 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: COLORS.CRIMSON,
     },
-    logoutText: {
-        fontSize: 14,
-        color: COLORS.CRIMSON,
-        fontWeight: '700',
-    },
+    logoutText: { fontSize: 14, color: COLORS.CRIMSON, fontWeight: '700' },
 
     /* FOOTER */
-    footer: {
-        textAlign: 'center',
-        fontSize: 11,
-        color: COLORS.GRAY400,
-        marginTop: 16,
-    },
+    footer: { textAlign: 'center', fontSize: 11, color: COLORS.GRAY400, marginTop: 16 },
 
     /* MODAL */
     modalBackdrop: {
@@ -549,8 +549,7 @@ const styles = StyleSheet.create({
         paddingBottom: 32,
     },
     modalHandle: {
-        width: 40,
-        height: 5,
+        width: 40, height: 5,
         backgroundColor: COLORS.GRAY200,
         borderRadius: 3,
         alignSelf: 'center',
@@ -569,27 +568,10 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 14,
     },
-    currencyRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.GRAY100,
-    },
-    currencyInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    currencyCode: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: COLORS.GRAY800,
-        width: 40,
-    },
-    currencyLabelModal: {
-        fontSize: 14,
-        color: COLORS.GRAY600,
-        fontWeight: '500',
-    },
-
+    currencyRowBorder: { borderBottomWidth: 1, borderBottomColor: COLORS.GRAY100 },
+    currencyInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    currencyCode: { fontSize: 16, fontWeight: '700', color: COLORS.GRAY800, width: 40 },
+    currencyLabelModal: { fontSize: 14, color: COLORS.GRAY600, fontWeight: '500' },
 });
 
-export default ProfileScreen;
+export default React.memo(ProfileScreen);
