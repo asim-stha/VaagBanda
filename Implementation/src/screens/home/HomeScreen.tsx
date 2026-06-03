@@ -142,6 +142,7 @@ interface User {
   id: string;
   name: string;
   avatarColor: string;
+  avatarUrl?: string;
 }
 
 function avatarColorForId(id: string): string {
@@ -152,16 +153,26 @@ function avatarColorForId(id: string): string {
 }
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
-const Avatar = ({ user, size = 42 }: { user: User; size?: number }) => (
-  <View style={[styles.avatar, {
-    width: size, height: size, borderRadius: size / 2,
-    backgroundColor: user.avatarColor,
-  }]}>
-    <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
-      {user.name.charAt(0).toUpperCase()}
-    </Text>
-  </View>
-);
+const Avatar = ({ user, size = 42 }: { user: User; size?: number }) => {
+  if (user.avatarUrl) {
+    return (
+      <Image
+        source={{ uri: user.avatarUrl }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
+  }
+  return (
+    <View style={[styles.avatar, {
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: user.avatarColor,
+    }]}>
+      <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
+        {user.name.charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
+};
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface HomeScreenProps {
@@ -349,6 +360,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       name: authUser?.name || authUser?.email?.split('@')[0] || 'User',
       email: authUser?.email || '',
       avatarColor: avatarColorForId(id),
+      avatarUrl: authUser?.avatarUrl,
     };
   }, [authUser]);
 
