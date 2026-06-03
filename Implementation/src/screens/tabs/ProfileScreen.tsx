@@ -72,22 +72,33 @@ const Icon = ({
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({
-    name, color, size = 64,
-}: { name: string; color: string; size?: number }) => (
-    <View style={[styles.avatar, {
-        width: size, height: size, borderRadius: size / 2, backgroundColor: color,
-    }]}>
-        <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
-            {name.charAt(0).toUpperCase()}
-        </Text>
-    </View>
-);
+    name, color, size = 64, imageUrl,
+}: { name: string; color: string; size?: number; imageUrl?: string }) => {
+    if (imageUrl) {
+        return (
+            <Image
+                source={{ uri: imageUrl }}
+                style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+            />
+        );
+    }
+    return (
+        <View style={[styles.avatar, {
+            width: size, height: size, borderRadius: size / 2, backgroundColor: color,
+        }]}>
+            <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
+                {name.charAt(0).toUpperCase()}
+            </Text>
+        </View>
+    );
+};
 
 /* ─── TYPES ────────────────────────────────────────────────── */
 interface UserInfo {
     name: string;
     email: string;
     avatarColor: string;
+    avatarUrl?: string;
 }
 
 interface SettingsItem {
@@ -197,7 +208,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {/* Decorative blob */}
                     <View style={styles.blob} />
 
-                    <Avatar name={user?.name || 'User'} color={user?.avatarColor || COLORS.CRIMSON} size={72} />
+                    <Avatar name={user?.name || 'User'} color={user?.avatarColor || COLORS.CRIMSON} size={72} imageUrl={user?.avatarUrl} />
                     <Text style={styles.headerName}>{user?.name || 'User'}</Text>
                     <Text style={styles.headerEmail}>{user?.email || ''}</Text>
 
