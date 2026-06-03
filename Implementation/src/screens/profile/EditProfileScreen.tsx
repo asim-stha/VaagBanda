@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { supabase } from '../../lib/supabase';
 
 const C = {
     CRIMSON: '#DC143C', CRIMSON_DARK: '#A01030',
@@ -17,6 +19,22 @@ const C = {
     GRAY400: '#9AA3B5', GRAY600: '#5A6478', GRAY800: '#1F2A44',
     SUCCESS: '#27AE60',
 };
+
+/* ─── base64 → Uint8Array (React Native has no atob for binary) ─── */
+function decode(base64: string): Uint8Array {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const bytes: number[] = [];
+    for (let i = 0; i < base64.length; i += 4) {
+        const a = chars.indexOf(base64[i]);
+        const b = chars.indexOf(base64[i + 1]);
+        const c = chars.indexOf(base64[i + 2]);
+        const d = chars.indexOf(base64[i + 3]);
+        bytes.push((a << 2) | (b >> 4));
+        if (base64[i + 2] !== '=') bytes.push(((b & 15) << 4) | (c >> 2));
+        if (base64[i + 3] !== '=') bytes.push(((c & 3) << 6) | d);
+    }
+    return new Uint8Array(bytes);
+}
 
 const Icon = ({ name, size = 18, color = C.GRAY400 }: { name: string; size?: number; color?: string }) => {
     const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -54,6 +72,25 @@ const EditProfileScreen: React.FC<Props> = ({
     const [imageUri, setImageUri] = useState<string | null>(avatarUrl ?? authUser?.avatarUrl ?? null);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [deletedAvatar, setDeletedAvatar] = useState(false);
+    const originalAvatarUrl = useRef<string | null>(avatarUrl ?? authUser?.avatarUrl ?? null);
+
+    useEffect(() => {
+        const fetchAvatar = async () => {
+            const { data: { user: supaUser } } = await supabase.auth.getUser();
+            if (!supaUser) return;
+            const { data } = await supabase
+                .from('profiles')
+                .select('avatar_url')
+                .eq('user_id', supaUser.id)
+                .single();
+            if (data?.avatar_url) {
+                setImageUri(data.avatar_url);
+                originalAvatarUrl.current = data.avatar_url;
+            }
+        };
+        fetchAvatar();
+    }, []);
 
     const canSave = name.trim().length > 0 && email.includes('@');
 
@@ -71,6 +108,7 @@ const EditProfileScreen: React.FC<Props> = ({
         });
         if (!result.canceled && result.assets[0]) {
             setImageUri(result.assets[0].uri);
+            setDeletedAvatar(false);
         }
     };
 
@@ -87,6 +125,7 @@ const EditProfileScreen: React.FC<Props> = ({
         });
         if (!result.canceled && result.assets[0]) {
             setImageUri(result.assets[0].uri);
+            setDeletedAvatar(false);
         }
     };
 
@@ -94,7 +133,7 @@ const EditProfileScreen: React.FC<Props> = ({
         Alert.alert('Change Profile Photo', '', [
             { text: 'Take Photo', onPress: pickFromCamera },
             { text: 'Choose from Library', onPress: pickFromLibrary },
-            ...(imageUri ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => setImageUri(null) }] : []),
+            ...(imageUri ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => { setImageUri(null); setDeletedAvatar(true); } }] : []),
             { text: 'Cancel', style: 'cancel' },
         ]);
     };
@@ -103,17 +142,66 @@ const EditProfileScreen: React.FC<Props> = ({
         if (!canSave || saving) return;
         setSaving(true);
         try {
-            await onSave?.({ name: name.trim(), email: email.trim(), avatarUri: imageUri ?? undefined });
+            let finalAvatarUri = imageUri ?? undefined;
+
+            if (deletedAvatar && !imageUri) {
+                const { data: { user: supaUser } } = await supabase.auth.getUser();
+                if (supaUser) {
+                    await supabase.from('profiles').update({ avatar_url: null }).eq('user_id', supaUser.id);
+                    if (originalAvatarUrl.current) {
+                        const marker = '/public/avatars/';
+                        const idx = originalAvatarUrl.current.indexOf(marker);
+                        if (idx !== -1) {
+                            const storagePath = originalAvatarUrl.current.slice(idx + marker.length);
+                            await supabase.storage.from('avatars').remove([storagePath]);
+                        }
+                    }
+                }
+                finalAvatarUri = undefined;
+
+            } else if (imageUri && !imageUri.startsWith('http')) {
+                const { data: { user: supaUser } } = await supabase.auth.getUser();
+                if (supaUser) {
+                    const ext = imageUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+                    const filePath = `${supaUser.id}/avatar_${Date.now()}.${ext}`;
+                    const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+                    // Read file as base64 — required in React Native (blob upload doesn't work)
+                    const base64 = await FileSystem.readAsStringAsync(imageUri, {
+                        encoding:'base64',
+                    });
+
+                    const { error: uploadError } = await supabase.storage
+                        .from('avatars')
+                        .upload(filePath, decode(base64), {
+                            contentType,
+                            upsert: true,
+                        });
+
+                    if (uploadError) {
+                        console.error('Upload error:', uploadError.message);
+                        Alert.alert('Upload failed', uploadError.message);
+                    } else {
+                        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+                        // Cache-bust so React Native shows the new image immediately
+                        const bustUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+                        console.log('Avatar uploaded:', bustUrl);
+                        finalAvatarUri = bustUrl;
+                        setImageUri(bustUrl);
+                    }
+                }
+            }
+
+            await onSave?.({ name: name.trim(), email: email.trim(), avatarUri: finalAvatarUri });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
-        } catch {
+        } catch (err: any) {
+            console.error('Save error:', err.message);
             Alert.alert('Error', 'Failed to save profile. Please try again.');
         } finally {
             setSaving(false);
         }
     };
-
-    const currentImage = imageUri;
 
     return (
         <SafeAreaView style={s.safe}>
@@ -134,20 +222,23 @@ const EditProfileScreen: React.FC<Props> = ({
                             </TouchableOpacity>
                         </View>
 
-                        {/* Avatar with camera overlay */}
                         <TouchableOpacity activeOpacity={0.85} onPress={handlePickImage} style={s.avatarWrap}>
-                            {currentImage ? (
-                                <Image
-                                    source={{ uri: currentImage }}
-                                    style={s.avatarImg}
-                                />
-                            ) : (
-                                <LetterAvatar name={name || 'U'} color={avatarColor} size={80} />
-                            )}
-                            <View style={s.cameraBadge}>
-                                <Icon name="camera" size={14} color={C.WHITE} />
-                            </View>
-                        </TouchableOpacity>
+    <View style={{ width: 80, height: 80, borderRadius: 40, overflow: 'hidden', backgroundColor: avatarColor }}>
+        {imageUri ? (
+            <Image
+                source={{ uri: imageUri }}
+                style={{ width: 80, height: 80 }}
+                onLoad={() => console.log('Image loaded OK')}
+                onError={(e) => console.log('Image error:', e.nativeEvent.error)}
+            />
+        ) : (
+            <LetterAvatar name={name || 'U'} color={avatarColor} size={80} />
+        )}
+    </View>
+    <View style={s.cameraBadge}>
+        <Icon name="camera" size={14} color={C.WHITE} />
+    </View>
+</TouchableOpacity>
                         <Text style={s.changePhotoHint}>Tap to change photo</Text>
                     </LinearGradient>
 
@@ -202,8 +293,9 @@ const s = StyleSheet.create({
     saveBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.15)' },
     saveBtnText: { color: C.WHITE, fontSize: 13, fontWeight: '700' },
     saveBtnTextDisabled: { color: 'rgba(255,255,255,0.50)' },
-    avatarWrap: { marginTop: 14, position: 'relative' },
-    avatarImg: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: 'rgba(255,255,255,0.30)' },
+    avatarWrap: { marginTop: 14, position: 'relative', width: 80, height: 80 },
+    avatarImgWrap: { width: 80, height: 80, borderRadius: 40, overflow: 'hidden', borderWidth: 3, borderColor: 'rgba(255,255,255,0.30)' },
+    avatarImg: { width: 80, height: 80 },
     cameraBadge: { position: 'absolute', bottom: 0, right: -4, width: 30, height: 30, borderRadius: 15, backgroundColor: C.CRIMSON, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.BLUE_DARK },
     changePhotoHint: { color: 'rgba(255,255,255,0.60)', fontSize: 11, marginTop: 6, fontWeight: '500' },
     sheet: { paddingHorizontal: 22, paddingTop: 22 },
