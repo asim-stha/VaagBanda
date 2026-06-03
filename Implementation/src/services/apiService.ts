@@ -885,4 +885,79 @@ export const apiService = {
 
     return { data: { categories, monthly, currency: g.default_currency } };
   },
+
+  async leaveGroup(groupId: string): Promise<void> {
+    const userId = await getCurrentUserId();
+
+    // Check if user is a member
+    const { data: membership, error: mErr } = await supabase
+      .from('group_members')
+      .select('member_id')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+    if (mErr || !membership) throw new Error('You are not a member of this group');
+
+    // Check if user has unsettled expenses
+    const { data: g } = await supabase
+      .from('groups')
+      .select('expenses(expense_id, paid_by, amount, expense_splits(user_id, amount_owed)), settlements(payer_id, payee_id, amount)')
+      .eq('group_id', groupId)
+      .single();
+
+    const allExpenses: DbExpense[] = (g?.expenses || []).map((e: any) => ({
+      ...e,
+      expense_splits: e.expense_splits || [],
+    }));
+    const allSettlements: DbSettlement[] = (g?.settlements || []).map((s: any) => ({
+      ...s,
+      created_at: s.created_at || '',
+    }));
+
+    const userBalance = computeBalance(allExpenses, allSettlements, userId);
+    if (Math.abs(userBalance) > 0.01) {
+      throw new Error('You have unsettled expenses. Please settle your balance before leaving the group.');
+    }
+
+    // Remove user from group
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+    if (error) throw new Error(error.message);
+  },
+
+  async removeGroupMember(groupId: string, memberId: string): Promise<void> {
+    await requireGroupAdmin(groupId);
+
+    // Check if member has unsettled expenses
+    const { data: g } = await supabase
+      .from('groups')
+      .select('expenses(expense_id, paid_by, amount, expense_splits(user_id, amount_owed)), settlements(payer_id, payee_id, amount)')
+      .eq('group_id', groupId)
+      .single();
+
+    const allExpenses: DbExpense[] = (g?.expenses || []).map((e: any) => ({
+      ...e,
+      expense_splits: e.expense_splits || [],
+    }));
+    const allSettlements: DbSettlement[] = (g?.settlements || []).map((s: any) => ({
+      ...s,
+      created_at: s.created_at || '',
+    }));
+
+    const memberBalance = computeBalance(allExpenses, allSettlements, memberId);
+    if (Math.abs(memberBalance) > 0.01) {
+      throw new Error('This member has unsettled expenses. Please settle their balance before removing them from the group.');
+    }
+
+    // Remove member from group
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', memberId);
+    if (error) throw new Error(error.message);
+  },
 };
