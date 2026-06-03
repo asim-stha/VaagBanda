@@ -18,6 +18,7 @@ import {
     TouchableOpacity,
     Image,
     Modal,
+    Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -118,6 +119,7 @@ const CURRENCIES = [
     { code: 'JPY', label: 'Japanese Yen' },
 ];
 
+
 /* ─── SETTINGS ROW ─────────────────────────────────────────── */
 const SettingsRow = ({
     icon, label, value, onPress, isLast = false,
@@ -174,6 +176,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         { icon: '👤', label: 'Edit Profile', onPress: onEditProfile },
         { icon: '🔔', label: 'Notification Preferences', onPress: onNotificationPrefs },
         { icon: '💱', label: 'Default Currency', value: defaultCurrency, onPress: () => setShowCurrencyModal(true) },
+        { icon: '🎨', label: 'Appearance', value: 'Coming Soon', onPress: () => Alert.alert('Coming Soon', 'Light, Dark, and System Default themes will be available in a future update.') },
         { icon: '🔒', label: 'Security & Privacy', onPress: onSecurityPrivacy },
         { icon: 'ℹ️', label: 'About VaagBanda', onPress: onAbout, isLast: true },
     ];
@@ -309,6 +312,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
+
         </View>
     );
 };
@@ -574,6 +578,7 @@ const styles = StyleSheet.create({
         color: COLORS.GRAY600,
         fontWeight: '500',
     },
+
 });
 
 export default ProfileScreen;
