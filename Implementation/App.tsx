@@ -1,11 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { authService } from './src/services/authService';
 
 // Auth screens
 import SplashScreen from './src/screens/auth/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
 
 // Main screens
 import HomeScreen from './src/screens/home/HomeScreen';
@@ -23,7 +26,7 @@ import ScanReceiptScreen from './src/screens/expenses/ScanReceiptScreen';
 // Settlement
 import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
 
-// Tab screens (rendered inside HomeScreen)
+// Tab screens
 import ActivityScreen from './src/screens/tabs/ActivityScreen';
 import ProfileScreen from './src/screens/tabs/ProfileScreen';
 
@@ -40,6 +43,7 @@ type Screen =
   | 'splash'
   | 'login'
   | 'signup'
+  | 'verify-email'
   | 'forgot'
   | 'home'
   | 'create-group'
@@ -58,26 +62,49 @@ type Screen =
 
 type Tab = 'home' | 'groups' | 'activity' | 'profile';
 
-/* ─── MAIN APP ─────────────────────────────────────────────── */
-export default function App() {
+/* ─── INNER NAVIGATOR ──────────────────────────────────────── */
+function AppNavigator() {
+  const { user, loading, signOut } = useAuth();
   const [screen, setScreen] = useState<Screen>('splash');
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string>('');
+
+  // Once Supabase finishes loading the session, go to the right screen
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        setScreen('home');
+      } else {
+        setScreen('login');
+      }
+    }
+  }, [user, loading]);
+
+  /* ─── SPLASH shown while auth loads ─── */
+  if (screen === 'splash' || loading) {
+    return <SplashScreen onDone={() => {}} />;
+  }
 
   /* ─── AUTH SCREENS ─── */
-
-  if (screen === 'splash') {
-    return <SplashScreen onDone={() => setScreen('login')} />;
-  }
 
   if (screen === 'signup') {
     return (
       <SignupScreen
         onGoToLogin={() => setScreen('login')}
-        onSignup={(data) => {
-          console.log('Signup:', data);
-          setScreen('home');
+        onSignup={async (data) => {
+          const { needsVerification } = await authService.signUp(
+            data.email,
+            data.password,
+            data.name,
+          );
+          if (needsVerification) {
+            setPendingVerifyEmail(data.email);
+            setScreen('verify-email');
+          }
+          // If needsVerification is false, Supabase auto-confirmed the user.
+          // The useEffect above will detect the session and go to 'home'.
         }}
         onGoogleSignup={() => console.log('google signup')}
         onAppleSignup={() => console.log('apple signup')}
@@ -87,13 +114,24 @@ export default function App() {
     );
   }
 
+  if (screen === 'verify-email') {
+    return (
+      <VerifyEmailScreen
+        email={pendingVerifyEmail}
+        onGoToLogin={() => setScreen('login')}
+        onResend={async () => {
+          await authService.resendVerification(pendingVerifyEmail);
+        }}
+      />
+    );
+  }
+
   if (screen === 'forgot') {
     return (
       <ForgotPasswordScreen
         onGoToLogin={() => setScreen('login')}
         onSubmit={async (email) => {
-          console.log('Reset for:', email);
-          await new Promise(r => setTimeout(r, 800));
+          await authService.resetPassword(email);
         }}
       />
     );
@@ -273,7 +311,7 @@ export default function App() {
     );
   }
 
-  /* ─── HOME (with tab handling) ─── */
+  /* ─── HOME ─── */
 
   if (screen === 'home') {
     return (
@@ -290,29 +328,34 @@ export default function App() {
         onOpenNotifications={() => setActiveTab('activity')}
         onEditProfile={() => setScreen('edit-profile')}
         onNotificationSettings={() => setScreen('notification-settings')}
-        onLogout={() => {
-          console.log('logout');
-          setScreen('login');
+        onLogout={async () => {
+          await signOut();
+          // useEffect above will detect user becoming null and go to 'login'
         }}
       />
     );
   }
 
-  /* ─── LOGIN (default) ─── */
+  /* ─── LOGIN (default fallback) ─── */
   return (
     <LoginScreen
       onLogin={() => {
-        console.log('login');
-        setScreen('home');
+        // Navigation handled automatically by useEffect when session is detected
       }}
       onGoToSignup={() => setScreen('signup')}
       onForgotPassword={() => setScreen('forgot')}
-      onBiometricLogin={() => {
-        console.log('biometric');
-        setScreen('home');
-      }}
-      onGoogleLogin={() => console.log('google login')}
-      onAppleLogin={() => console.log('apple login')}
+      onBiometricLogin={() => console.log('biometric — not implemented')}
+      onGoogleLogin={() => console.log('google login — not implemented')}
+      onAppleLogin={() => console.log('apple login — not implemented')}
     />
+  );
+}
+
+/* ─── ROOT ─────────────────────────────────────────────────── */
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
   );
 }
