@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import ActivityScreen from '../tabs/ActivityScreen';
+import ProfileScreen from '../tabs/ProfileScreen';
 import {
   View,
   Text,
@@ -141,10 +143,10 @@ interface Group {
 const ME: User = { id: 'u1', name: 'Asim', avatarColor: COLORS.CRIMSON };
 
 const MOCK_GROUPS: Group[] = [
-  { id: 'g1', name: 'Pokhara Trip',     emoji: '🏔️', currency: 'NPR', memberCount: 5, lastActivity: '2 hours ago',  myBalance:  2_450 },
-  { id: 'g2', name: 'Apartment 304',    emoji: '🏠', currency: 'NPR', memberCount: 3, lastActivity: 'Yesterday',    myBalance:   -890 },
-  { id: 'g3', name: 'Friday Pizza Club', emoji: '🍕', currency: 'NPR', memberCount: 6, lastActivity: '3 days ago',  myBalance:    520 },
-  { id: 'g4', name: 'Seoul Vacation',   emoji: '✈️', currency: 'KRW', memberCount: 4, lastActivity: 'Last week',    myBalance:      0 },
+  { id: 'g1', name: 'Pokhara Trip', emoji: '🏔️', currency: 'NPR', memberCount: 5, lastActivity: '2 hours ago', myBalance: 2_450 },
+  { id: 'g2', name: 'Apartment 304', emoji: '🏠', currency: 'NPR', memberCount: 3, lastActivity: 'Yesterday', myBalance: -890 },
+  { id: 'g3', name: 'Friday Pizza Club', emoji: '🍕', currency: 'NPR', memberCount: 6, lastActivity: '3 days ago', myBalance: 520 },
+  { id: 'g4', name: 'Seoul Vacation', emoji: '✈️', currency: 'KRW', memberCount: 4, lastActivity: 'Last week', myBalance: 0 },
 ];
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
@@ -228,10 +230,10 @@ const TabBar = ({
   hasUnread?: boolean;
 }) => {
   const tabs: { key: 'home' | 'groups' | 'activity' | 'profile'; label: string; icon: IconName }[] = [
-    { key: 'home',     label: 'Home',     icon: 'home' },
-    { key: 'groups',   label: 'Groups',   icon: 'groups' },
+    { key: 'home', label: 'Home', icon: 'home' },
+    { key: 'groups', label: 'Groups', icon: 'groups' },
     { key: 'activity', label: 'Activity', icon: 'activity' },
-    { key: 'profile',  label: 'Profile',  icon: 'profile' },
+    { key: 'profile', label: 'Profile', icon: 'profile' },
   ];
   return (
     <View style={styles.tabBar}>
@@ -279,7 +281,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   hasUnreadNotifications = true,
 }) => {
   const { signOut, user: authUser } = useAuth();
-  
+
   const displayUser = useMemo(() => {
     return {
       id: authUser?.id || user.id,
@@ -315,9 +317,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={styles.profileName}>{displayUser.name}</Text>
               <Text style={styles.profileEmail}>{displayUser.email}</Text>
             </View>
-            
+
             <View style={styles.profileDivider} />
-            
+
             <View style={styles.profileDetailsRow}>
               <Text style={styles.profileDetailsLabel}>Account ID</Text>
               <Text style={styles.profileDetailsValue} numberOfLines={1}>
@@ -387,17 +389,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               {overallBalance > 0
                 ? "You're owed across your groups"
                 : overallBalance < 0
-                ? 'You owe across your groups'
-                : "You're all settled up"}
+                  ? 'You owe across your groups'
+                  : "You're all settled up"}
             </Text>
           </View>
         </LinearGradient>
 
         {/* ─── QUICK ACTIONS ─── */}
         <View style={styles.quickActionsRow}>
-          <QuickAction icon="plus"     label="Add Expense"  color={COLORS.CRIMSON} onPress={onAddExpense} />
-          <QuickAction icon="scan"     label="Scan Receipt" color={COLORS.BLUE}    onPress={onScanReceipt} />
-          <QuickAction icon="addGroup" label="New Group"    color={COLORS.CRIMSON_DARK} onPress={onCreateGroup} />
+          <QuickAction icon="plus" label="Add Expense" color={COLORS.CRIMSON} onPress={onAddExpense} />
+          <QuickAction icon="scan" label="Scan Receipt" color={COLORS.BLUE} onPress={onScanReceipt} />
+          <QuickAction icon="addGroup" label="New Group" color={COLORS.CRIMSON_DARK} onPress={onCreateGroup} />
         </View>
 
         {/* ─── GROUPS SECTION ─── */}
@@ -476,6 +478,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       />
     </SafeAreaView>
   );
+  // Inside HomeScreen component, at the top of the return:
+
+  if (activeTab === 'activity') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+        <ActivityScreen />
+        <TabBar active={activeTab} onTabChange={onTabChange} hasUnread={hasUnreadNotifications} />
+      </SafeAreaView>
+    );
+  }
+
+  if (activeTab === 'profile') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
+        <ProfileScreen
+          onLogout={() => {
+            // Wire to your auth logic later
+            console.log('logout');
+          }}
+        />
+        <TabBar active={activeTab} onTabChange={onTabChange} hasUnread={hasUnreadNotifications} />
+      </SafeAreaView>
+    );
+  }
+
+  // ... rest of the existing HomeScreen return (the 'home' tab content)
 };
 
 /* ─── STYLES ───────────────────────────────────────────────── */
