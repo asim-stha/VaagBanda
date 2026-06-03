@@ -5,6 +5,7 @@ export interface AppUser {
   name: string;
   email: string;
   avatarColor: string;
+  avatarUrl?: string;
 }
 
 function avatarColorFromId(id: string): string {
@@ -15,17 +16,34 @@ function avatarColorFromId(id: string): string {
 }
 
 async function fetchProfile(userId: string): Promise<AppUser | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
-    .select('user_id, full_name, email, avatar_color')
+    .select('user_id, full_name, email, avatar_color, avatar_url')
     .eq('user_id', userId)
     .single();
-  if (!data) return null;
+
+  if (error || !data) {
+    // avatar_url column may not exist yet — fall back to base columns so login still works
+    const { data: base } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, email, avatar_color')
+      .eq('user_id', userId)
+      .single();
+    if (!base) return null;
+    return {
+      id: base.user_id,
+      name: base.full_name || 'User',
+      email: base.email || '',
+      avatarColor: base.avatar_color || avatarColorFromId(userId),
+    };
+  }
+
   return {
     id: data.user_id,
     name: data.full_name || 'User',
     email: data.email || '',
     avatarColor: data.avatar_color || avatarColorFromId(userId),
+    avatarUrl: data.avatar_url || undefined,
   };
 }
 
@@ -63,8 +81,13 @@ export const authService = {
   async getSession(): Promise<{ access_token: string; user: AppUser } | null> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
-    const user = await fetchProfile(session.user.id);
-    if (!user) return null;
+    const profile = await fetchProfile(session.user.id);
+    const user: AppUser = profile ?? {
+      id: session.user.id,
+      name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+      email: session.user.email ?? '',
+      avatarColor: avatarColorFromId(session.user.id),
+    };
     return { access_token: session.access_token, user };
   },
 
