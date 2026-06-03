@@ -3,8 +3,10 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-    StatusBar, SafeAreaView, Alert,
+    StatusBar, Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { apiService } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline, Circle } from 'react-native-svg';

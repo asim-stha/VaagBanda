@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { authService } from './src/services/authService';
 import { apiService } from './src/services/apiService';
@@ -80,6 +81,7 @@ function AppNavigator() {
   const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string>('');
   const [groupContext, setGroupContext] = useState<GroupContext | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Once Supabase finishes loading the session, go to the right screen
   useEffect(() => {
@@ -234,6 +236,7 @@ function AppNavigator() {
         onBack={() => setScreen('home')}
         onCreate={(group) => {
           console.log('Group created:', group);
+          setRefreshKey(k => k + 1);
           setScreen('home');
         }}
       />
@@ -338,6 +341,7 @@ function AppNavigator() {
       <HomeScreen
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        refreshKey={refreshKey}
         onGroupTap={(id) => {
           setActiveGroupId(id);
           setScreen('group');
@@ -374,8 +378,10 @@ function AppNavigator() {
 /* ─── ROOT ─────────────────────────────────────────────────── */
 export default function App() {
   return (
-    <AuthProvider>
-      <AppNavigator />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

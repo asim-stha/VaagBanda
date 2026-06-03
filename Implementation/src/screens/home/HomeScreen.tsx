@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ActivityScreen from '../tabs/ActivityScreen';
 import ProfileScreen from '../tabs/ProfileScreen';
 import {
@@ -8,10 +8,11 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
   Image,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiService, GroupSummary } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
 import { useAuth } from '../../context/AuthContext';
@@ -130,25 +131,8 @@ interface User {
   avatarColor: string;
 }
 
-interface Group {
-  id: string;
-  name: string;
-  emoji: string;
-  currency: string;
-  memberCount: number;
-  lastActivity: string;
-  myBalance: number; // derived from SUM(Splits.amount_owed) - SUM(Settlements.amount)
-}
-
-/* ─── MOCK DATA (replace with API/store wiring later) ─── */
+/* ─── MOCK DATA ─── */
 const ME: User = { id: 'u1', name: 'Asim', avatarColor: COLORS.CRIMSON };
-
-const MOCK_GROUPS: Group[] = [
-  { id: 'g1', name: 'Pokhara Trip', emoji: '🏔️', currency: 'NPR', memberCount: 5, lastActivity: '2 hours ago', myBalance: 2_450 },
-  { id: 'g2', name: 'Apartment 304', emoji: '🏠', currency: 'NPR', memberCount: 3, lastActivity: 'Yesterday', myBalance: -890 },
-  { id: 'g3', name: 'Friday Pizza Club', emoji: '🍕', currency: 'NPR', memberCount: 6, lastActivity: '3 days ago', myBalance: 520 },
-  { id: 'g4', name: 'Seoul Vacation', emoji: '✈️', currency: 'KRW', memberCount: 4, lastActivity: 'Last week', myBalance: 0 },
-];
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({ user, size = 42 }: { user: User; size?: number }) => (
@@ -165,7 +149,6 @@ const Avatar = ({ user, size = 42 }: { user: User; size?: number }) => (
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface HomeScreenProps {
   user?: User;
-  groups?: Group[];
   onGroupTap?: (groupId: string) => void;
   onAddExpense?: () => void;
   onScanReceipt?: () => void;
@@ -177,7 +160,7 @@ interface HomeScreenProps {
   onNotificationSettings?: () => void;
   onEditProfile?: () => void;
   onLogout?: () => void;
-  // Trigger TS Server reload
+  refreshKey?: number;
 }
 
 /* ─── QUICK ACTION CARD ────────────────────────────────────── */
@@ -195,7 +178,7 @@ const QuickAction = ({
 );
 
 /* ─── GROUP CARD ───────────────────────────────────────────── */
-const GroupCard = ({ group, onPress }: { group: Group; onPress?: () => void }) => {
+const GroupCard = ({ group, onPress }: { group: GroupSummary; onPress?: () => void }) => {
   const isOwed = group.myBalance > 0;
   const owes = group.myBalance < 0;
   const settled = group.myBalance === 0;
@@ -275,7 +258,6 @@ const TabBar = ({
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
 const HomeScreen: React.FC<HomeScreenProps> = ({
   user = ME,
-  groups = MOCK_GROUPS,
   onGroupTap,
   onAddExpense,
   onScanReceipt,
@@ -287,8 +269,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onNotificationSettings,
   onEditProfile,
   onLogout,
+  refreshKey = 0,
 }) => {
   const { signOut, user: authUser } = useAuth();
+  const [groups, setGroups] = useState<GroupSummary[]>([]);
+
+  useEffect(() => {
+    apiService.getGroups()
+      .then(({ data }) => setGroups(data))
+      .catch(() => setGroups([]));
+  }, [refreshKey]);
 
   const displayUser = useMemo(() => {
     return {

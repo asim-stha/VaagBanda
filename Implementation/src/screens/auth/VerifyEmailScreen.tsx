@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, StatusBar, ActivityIndicator, // ActivityIndicator used by resend spinner
+  View, Text, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator, // ActivityIndicator used by resend spinner
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 

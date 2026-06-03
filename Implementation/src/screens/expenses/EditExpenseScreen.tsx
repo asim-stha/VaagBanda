@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-    KeyboardAvoidingView, Platform, StatusBar, SafeAreaView, Alert,
+    KeyboardAvoidingView, Platform, StatusBar, Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { apiService } from '../../services/apiService';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Polyline } from 'react-native-svg';

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 
@@ -131,21 +133,13 @@ interface Contact {
   isRegistered: boolean; // false → will receive a join invitation per SRS §4.2.3
 }
 
-/* ─── MOCK DATA ────────────────────────────────────────────── */
-const ME: Contact = {
-  id: 'u1', name: 'Asim', email: 'asim@dsu.ac.kr',
-  avatarColor: COLORS.CRIMSON, isRegistered: true,
-};
+const AVATAR_PALETTE = ['#DC143C', '#1A2B5F', '#9C27B0', '#FF6F00', '#00838F', '#5E35B1', '#D81B60', '#43A047'];
 
-const CONTACT_BOOK: Contact[] = [
-  { id: 'u2', name: 'Krishna Sharma',  email: 'krishna@example.com',  avatarColor: COLORS.BLUE,    isRegistered: true  },
-  { id: 'u3', name: 'Riya Tamang',     email: 'riya@example.com',     avatarColor: '#9C27B0',      isRegistered: true  },
-  { id: 'u4', name: 'Bibek Thapa',     email: 'bibek@example.com',    avatarColor: '#FF6F00',      isRegistered: true  },
-  { id: 'u5', name: 'Sita Rai',        email: 'sita@example.com',     avatarColor: '#00838F',      isRegistered: true  },
-  { id: 'u6', name: 'Prakash Gurung',  email: 'prakash@example.com',  avatarColor: '#5E35B1',      isRegistered: true  },
-  { id: 'u7', name: 'Anjali Karki',    email: 'anjali@example.com',   avatarColor: '#D81B60',      isRegistered: false },
-  { id: 'u8', name: 'Hari Bhatta',     email: 'hari@example.com',     avatarColor: '#43A047',      isRegistered: true  },
-];
+function colorFromId(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
 
 /* ─── AVATAR ───────────────────────────────────────────────── */
 const Avatar = ({
@@ -163,7 +157,6 @@ const Avatar = ({
 
 /* ─── PROPS ────────────────────────────────────────────────── */
 interface CreateGroupScreenProps {
-  contacts?: Contact[];
   onBack?: () => void;
   onCreate?: (group: {
     name: string;
@@ -177,7 +170,6 @@ interface CreateGroupScreenProps {
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
 const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
-  contacts = CONTACT_BOOK,
   onBack,
   onCreate,
 }) => {
@@ -189,6 +181,36 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
   const [search, setSearch] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]); // contact ids
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const currentId = user?.id ?? '';
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_color')
+          .neq('user_id', currentId);
+
+        if (!cancelled && !error && data) {
+          setContacts(data.map((p: any) => ({
+            id: p.user_id,
+            name: p.full_name || 'Unknown',
+            email: '',
+            avatarColor: p.avatar_color || colorFromId(p.user_id),
+            isRegistered: true,
+          })));
+        }
+      } finally {
+        if (!cancelled) setLoadingContacts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Filter contacts by search
   const filteredContacts = useMemo(() => {
@@ -411,7 +433,9 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
 
             {/* You (always included as admin) */}
             <View style={styles.youCard}>
-              <Avatar contact={ME} size={40} />
+              <View style={[styles.avatar, { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.CRIMSON }]}>
+                <Text style={[styles.avatarText, { fontSize: 16 }]}>Y</Text>
+              </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.youName}>You</Text>
                 <Text style={styles.youLabel}>Group admin</Text>
@@ -442,7 +466,9 @@ const CreateGroupScreen: React.FC<CreateGroupScreenProps> = ({
 
             {/* Contact list */}
             <View style={styles.contactList}>
-              {filteredContacts.length === 0 ? (
+              {loadingContacts ? (
+                <ActivityIndicator style={{ paddingVertical: 24 }} color={COLORS.CRIMSON} />
+              ) : filteredContacts.length === 0 ? (
                 <View style={styles.contactEmpty}>
                   <Text style={styles.contactEmojiBig}>🔍</Text>
                   <Text style={styles.contactEmptyTitle}>

@@ -10,10 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  SafeAreaView,
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Circle, Line, Polyline } from 'react-native-svg';
 import { authService } from '../../services/authService';
