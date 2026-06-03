@@ -74,7 +74,7 @@ interface GroupContext {
   groupName: string;
   groupEmoji?: string;
   groupCurrency: string;
-  members: Array<{ id: string; name: string; avatarColor: string; balance: number }>;
+  members: Array<{ id: string; name: string; avatarColor: string; balance: number; role: 'admin' | 'member' }>;
   myUserId: string;
 }
 
@@ -288,7 +288,7 @@ function AppNavigator() {
         groupName={groupContext?.groupName ?? ''}
         groupEmoji={groupContext?.groupEmoji ?? '👥'}
         groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
-        members={(groupContext?.members ?? []).map(m => ({ ...m, role: (m.id === groupContext?.myUserId ? 'admin' : 'member') as 'admin' | 'member' }))}
+        members={groupContext?.members ?? []}
         myUserId={groupContext?.myUserId ?? ''}
         onBack={() => setScreen('group')}
         onSave={() => setScreen('group')}

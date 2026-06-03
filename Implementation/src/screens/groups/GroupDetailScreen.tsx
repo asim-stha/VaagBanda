@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { apiService, GroupDetail as ApiGroupDetail } from '../../services/apiService';
+import { apiService } from '../../services/apiService';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,7 +34,7 @@ const COLORS = {
 };
 
 /* ─── ICONS ────────────────────────────────────────────────── */
-type IconName = 'back' | 'plus' | 'check' | 'settings' | 'receipt';
+type IconName = 'back' | 'plus' | 'check' | 'settings' | 'receipt' | 'leave' | 'menu' | 'trash';
 
 const Icon = ({
   name, size = 18, color = COLORS.GRAY400,
@@ -79,6 +81,29 @@ const Icon = ({
           <Line x1="8" y1="16" x2="12" y2="16" />
         </Svg>
       );
+    case 'leave':
+      return (
+        <Svg {...props}>
+          <Path d="M17 16l4-4m0 0l-4-4m4 4H7m0-7v12a2 2 0 002 2h10a2 2 0 002-2V3a2 2 0 00-2-2H9a2 2 0 00-2 2" />
+        </Svg>
+      );
+    case 'menu':
+      return (
+        <Svg {...props}>
+          <Circle cx="12" cy="5" r="2" fill={color} />
+          <Circle cx="12" cy="12" r="2" fill={color} />
+          <Circle cx="12" cy="19" r="2" fill={color} />
+        </Svg>
+      );
+    case 'trash':
+      return (
+        <Svg {...props}>
+          <Polyline points="3 6 5 6 21 6" />
+          <Path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+          <Line x1="10" y1="11" x2="10" y2="17" />
+          <Line x1="14" y1="11" x2="14" y2="17" />
+        </Svg>
+      );
     default: return null;
   }
 };
@@ -96,6 +121,7 @@ interface Member {
   name: string;
   avatarColor: string;
   balance: number; // positive = is owed; negative = owes
+  role: 'admin' | 'member';
 }
 
 interface Expense {
@@ -115,6 +141,7 @@ interface GroupDetail {
   name: string;
   emoji: string;
   currency: string;
+  myRole: 'admin' | 'member';
   members: Member[];
   expenses: Expense[];
   myUserId: string;
@@ -170,8 +197,8 @@ const ExpenseCard = ({
 
 /* ─── MEMBER BALANCE ROW ───────────────────────────────────── */
 const MemberRow = ({
-  member, currency, isMe,
-}: { member: Member; currency: string; isMe: boolean }) => {
+  member, currency, isMe, isAdmin, onRemove,
+}: { member: Member; currency: string; isMe: boolean; isAdmin: boolean; onRemove?: (memberId: string) => void }) => {
   const positive = member.balance > 0;
   const negative = member.balance < 0;
   const settled  = member.balance === 0;
@@ -193,6 +220,15 @@ const MemberRow = ({
         </Text>
         <Text style={styles.memberCurrency}>{currency}</Text>
       </View>
+      {isAdmin && !isMe && (
+        <TouchableOpacity
+          onPress={() => onRemove?.(member.id)}
+          style={styles.memberMenuBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icon name="menu" size={18} color={COLORS.GRAY400} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -222,6 +258,8 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
   const [group, setGroup] = useState<GroupDetail | null>(groupProp ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLeavingGroup, setIsLeavingGroup] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!groupId) { setLoading(false); return; }
@@ -235,6 +273,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
           emoji: data.emoji,
           currency: data.currency,
           myUserId: data.myUserId,
+          myRole: data.myRole,
           members: data.members,
           expenses: data.expenses as any,
         });
@@ -248,6 +287,76 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
     [group]
   );
   const myBalance = myMember?.balance ?? 0;
+
+  const handleLeaveGroup = () => {
+    if (!group) return;
+
+    Alert.alert(
+      'Leave Group?',
+      `You're about to leave "${group.name}". Make sure all your expenses are settled.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave Group',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLeavingGroup(true);
+            try {
+              await apiService.leaveGroup(group.id);
+              Alert.alert('Success', 'You have left the group');
+              onBack?.();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to leave group');
+            } finally {
+              setIsLeavingGroup(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    if (!group) return;
+
+    const member = group.members.find(m => m.id === memberId);
+    if (!member) return;
+
+    Alert.alert(
+      'Remove Member?',
+      `You're about to remove "${member.name}" from "${group.name}". Make sure all their expenses are settled.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingMemberId(memberId);
+            try {
+              await apiService.removeGroupMember(group.id, memberId);
+              // Refresh group data
+              const { data } = await apiService.getGroup(group.id);
+              setGroup({
+                id: data.id,
+                name: data.name,
+                emoji: data.emoji,
+                currency: data.currency,
+                myUserId: data.myUserId,
+                myRole: data.myRole,
+                members: data.members,
+                expenses: data.expenses as any,
+              });
+              Alert.alert('Success', `${member.name} has been removed from the group`);
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to remove member');
+            } finally {
+              setRemovingMemberId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) {
     return (
@@ -304,7 +413,7 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
           {/* Decorative blob */}
           <View style={styles.blob} />
 
-          {/* Top row: back + settings */}
+          {/* Top row: back + settings + leave */}
           <View style={styles.topRow}>
             <TouchableOpacity
               onPress={onBack}
@@ -314,14 +423,29 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
             >
               <Icon name="back" size={18} color={COLORS.WHITE} />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => onOpenSettings?.({ groupId: group.id, groupName: group.name, groupEmoji: group.emoji, groupCurrency: group.currency, members: group.members, myUserId: group.myUserId })}
-              activeOpacity={0.7}
-              style={styles.iconBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Icon name="settings" size={18} color={COLORS.WHITE} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={handleLeaveGroup}
+                disabled={isLeavingGroup}
+                activeOpacity={0.7}
+                style={styles.iconBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                {isLeavingGroup ? (
+                  <ActivityIndicator size={18} color={COLORS.WHITE} />
+                ) : (
+                  <Icon name="leave" size={18} color={COLORS.WHITE} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onOpenSettings?.({ groupId: group.id, groupName: group.name, groupEmoji: group.emoji, groupCurrency: group.currency, members: group.members, myUserId: group.myUserId })}
+                activeOpacity={0.7}
+                style={styles.iconBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Icon name="settings" size={18} color={COLORS.WHITE} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Group identity row */}
@@ -430,6 +554,8 @@ const GroupDetailScreen: React.FC<GroupDetailScreenProps> = ({
                   member={m}
                   currency={group.currency}
                   isMe={m.id === group.myUserId}
+                  isAdmin={group.myRole === 'admin'}
+                  onRemove={handleRemoveMember}
                 />
               ))}
             </View>
@@ -743,6 +869,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginTop: 1,
+  },
+  memberMenuBtn: {
+    marginLeft: 8,
+    padding: 8,
   },
 
   /* RECORD SETTLEMENT BUTTON */

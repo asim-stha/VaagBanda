@@ -29,7 +29,7 @@ interface GroupInfo {
     groupId: string;
     groupName: string;
     groupCurrency: string;
-    members: Array<{ id: string; name: string; avatarColor: string; balance: number }>;
+    members: Array<{ id: string; name: string; avatarColor: string; balance: number; role: 'admin' | 'member' }>;
     myUserId: string;
 }
 

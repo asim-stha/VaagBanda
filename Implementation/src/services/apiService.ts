@@ -17,6 +17,7 @@ export interface GroupMember {
   name: string;
   avatarColor: string;
   balance: number;
+  role: 'admin' | 'member';
 }
 
 export interface GroupExpense {
@@ -37,8 +38,16 @@ export interface GroupDetail {
   emoji: string;
   currency: string;
   myUserId: string;
+  myRole: 'admin' | 'member';
   members: GroupMember[];
   expenses: GroupExpense[];
+}
+
+export interface ProfileSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  avatarColor: string;
 }
 
 export interface Creditor {
@@ -117,6 +126,20 @@ async function getCurrentUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   return user.id;
+}
+
+async function requireGroupAdmin(groupId: string): Promise<string> {
+  const userId = await getCurrentUserId();
+  const { data: membership, error } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !membership) throw new Error('You are not a member of this group');
+  if (membership.role !== 'admin') throw new Error('Only admins can manage group members');
+  return userId;
 }
 
 // ─── Extended Types ───────────────────────────────────────────────────────────
@@ -231,7 +254,11 @@ export const apiService = {
 
     const memberIds = Array.from(new Set([userId, ...group.memberIds]));
     const { error: mErr } = await supabase.from('group_members').insert(
-      memberIds.map(uid => ({ group_id: newGroup.group_id, user_id: uid }))
+      memberIds.map(uid => ({
+        group_id: newGroup.group_id,
+        user_id: uid,
+        role: uid === userId ? 'admin' : 'member',
+      }))
     );
     if (mErr) throw new Error(mErr.message);
 
@@ -248,6 +275,71 @@ export const apiService = {
     };
   },
 
+  async searchProfiles(query: string, excludeUserIds: string[] = []): Promise<{ data: ProfileSearchResult[] }> {
+    const q = query.trim();
+    if (q.length < 2) return { data: [] };
+
+    let request = supabase
+      .from('profiles')
+      .select('user_id, full_name, email, avatar_color')
+      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(10);
+
+    if (excludeUserIds.length > 0) {
+      request = request.not('user_id', 'in', `(${excludeUserIds.join(',')})`);
+    }
+
+    const { data, error } = await request;
+    if (error) throw new Error(error.message);
+
+    return {
+      data: (data || []).map((p: any) => ({
+        id: p.user_id,
+        name: p.full_name || 'Unknown',
+        email: p.email || '',
+        avatarColor: p.avatar_color || avatarColorFromId(p.user_id),
+      })),
+    };
+  },
+
+  async addGroupMember(groupId: string, userIdToAdd: string): Promise<{ data: GroupDetail }> {
+    await requireGroupAdmin(groupId);
+
+    const { data: existing } = await supabase
+      .from('group_members')
+      .select('member_id')
+      .eq('group_id', groupId)
+      .eq('user_id', userIdToAdd)
+      .maybeSingle();
+    if (existing) throw new Error('This user is already in the group');
+
+    const { error } = await supabase.from('group_members').insert({
+      group_id: groupId,
+      user_id: userIdToAdd,
+      role: 'member',
+    });
+    if (error) throw new Error(error.message);
+
+    return apiService.getGroup(groupId);
+  },
+
+  async updateGroupMemberRole(
+    groupId: string,
+    memberId: string,
+    role: 'admin' | 'member',
+  ): Promise<{ data: GroupDetail }> {
+    await requireGroupAdmin(groupId);
+
+    const { error } = await supabase
+      .from('group_members')
+      .update({ role })
+      .eq('group_id', groupId)
+      .eq('user_id', memberId);
+    if (error) throw new Error(error.message);
+
+    return apiService.getGroup(groupId);
+  },
+
   async getGroup(groupId: string): Promise<{ data: GroupDetail }> {
     const userId = await getCurrentUserId();
 
@@ -255,7 +347,7 @@ export const apiService = {
       .from('groups')
       .select(`
         group_id, group_name, emoji, default_currency,
-        group_members(user_id, profiles(user_id, full_name, avatar_color)),
+        group_members(user_id, role, profiles(user_id, full_name, avatar_color)),
         expenses(expense_id, paid_by, title, category, amount, created_at,
           expense_splits(user_id, amount_owed)),
         settlements(settlement_id, payer_id, payee_id, amount, created_at)
@@ -277,6 +369,7 @@ export const apiService = {
         name: profile?.full_name || 'Unknown',
         avatarColor: profile?.avatar_color || avatarColorFromId(gm.user_id),
         balance: computeBalance(allExpenses, allSettlements, gm.user_id),
+        role: (gm.role || 'member') as 'admin' | 'member',
       };
     });
 
@@ -301,6 +394,8 @@ export const apiService = {
         };
       });
 
+    const myRole = ((g.group_members || []).find((gm: any) => gm.user_id === userId)?.role || 'member') as 'admin' | 'member';
+
     return {
       data: {
         id: g.group_id,
@@ -308,6 +403,7 @@ export const apiService = {
         emoji: g.emoji || '👥',
         currency: g.default_currency,
         myUserId: userId,
+        myRole,
         members,
         expenses,
       },
@@ -410,13 +506,40 @@ export const apiService = {
   },
 
   async deleteGroup(groupId: string): Promise<void> {
-    const { data: expenses, error: fetchErr } = await supabase
-      .from('expenses')
-      .select('expense_id')
-      .eq('group_id', groupId);
-    if (fetchErr) throw new Error(fetchErr.message);
+    const userId = await getCurrentUserId();
 
-    const expenseIds = (expenses || []).map((e: any) => e.expense_id);
+    // Only admins may delete the group
+    const { data: membership, error: roleErr } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+    if (roleErr || !membership) throw new Error('You are not a member of this group');
+    if (membership.role !== 'admin') throw new Error('Only admins can delete the group');
+
+    // Fetch all data needed for balance check
+    const { data: expenseRows } = await supabase
+      .from('expenses')
+      .select('expense_id, paid_by, amount, created_at, expense_splits(user_id, amount_owed)')
+      .eq('group_id', groupId);
+    const { data: settlementRows } = await supabase
+      .from('settlements')
+      .select('payer_id, payee_id, amount, created_at')
+      .eq('group_id', groupId);
+    const { data: memberRows } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupId);
+
+    const allExpenses: DbExpense[] = (expenseRows || []).map((e: any) => ({ ...e, expense_splits: e.expense_splits || [] }));
+    const allSettlements: DbSettlement[] = settlementRows || [];
+    const hasUnsettled = (memberRows || []).some(
+      (m: any) => Math.abs(computeBalance(allExpenses, allSettlements, m.user_id)) > 0.01
+    );
+    if (hasUnsettled) throw new Error('Please settle all balances before deleting the group');
+
+    const expenseIds = allExpenses.map((e: any) => e.expense_id);
     if (expenseIds.length > 0) {
       const { error: esErr } = await supabase
         .from('expense_splits')
@@ -761,5 +884,80 @@ export const apiService = {
     const monthly = Object.entries(monthTotals).map(([month, amount]) => ({ month, amount }));
 
     return { data: { categories, monthly, currency: g.default_currency } };
+  },
+
+  async leaveGroup(groupId: string): Promise<void> {
+    const userId = await getCurrentUserId();
+
+    // Check if user is a member
+    const { data: membership, error: mErr } = await supabase
+      .from('group_members')
+      .select('member_id')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+    if (mErr || !membership) throw new Error('You are not a member of this group');
+
+    // Check if user has unsettled expenses
+    const { data: g } = await supabase
+      .from('groups')
+      .select('expenses(expense_id, paid_by, amount, expense_splits(user_id, amount_owed)), settlements(payer_id, payee_id, amount)')
+      .eq('group_id', groupId)
+      .single();
+
+    const allExpenses: DbExpense[] = (g?.expenses || []).map((e: any) => ({
+      ...e,
+      expense_splits: e.expense_splits || [],
+    }));
+    const allSettlements: DbSettlement[] = (g?.settlements || []).map((s: any) => ({
+      ...s,
+      created_at: s.created_at || '',
+    }));
+
+    const userBalance = computeBalance(allExpenses, allSettlements, userId);
+    if (Math.abs(userBalance) > 0.01) {
+      throw new Error('You have unsettled expenses. Please settle your balance before leaving the group.');
+    }
+
+    // Remove user from group
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+    if (error) throw new Error(error.message);
+  },
+
+  async removeGroupMember(groupId: string, memberId: string): Promise<void> {
+    await requireGroupAdmin(groupId);
+
+    // Check if member has unsettled expenses
+    const { data: g } = await supabase
+      .from('groups')
+      .select('expenses(expense_id, paid_by, amount, expense_splits(user_id, amount_owed)), settlements(payer_id, payee_id, amount)')
+      .eq('group_id', groupId)
+      .single();
+
+    const allExpenses: DbExpense[] = (g?.expenses || []).map((e: any) => ({
+      ...e,
+      expense_splits: e.expense_splits || [],
+    }));
+    const allSettlements: DbSettlement[] = (g?.settlements || []).map((s: any) => ({
+      ...s,
+      created_at: s.created_at || '',
+    }));
+
+    const memberBalance = computeBalance(allExpenses, allSettlements, memberId);
+    if (Math.abs(memberBalance) > 0.01) {
+      throw new Error('This member has unsettled expenses. Please settle their balance before removing them from the group.');
+    }
+
+    // Remove member from group
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', memberId);
+    if (error) throw new Error(error.message);
   },
 };
