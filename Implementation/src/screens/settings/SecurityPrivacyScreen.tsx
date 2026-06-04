@@ -402,8 +402,8 @@ const SecurityPrivacyScreen: React.FC<Props> = ({ onBack, onLogout }) => {
                           {
                             backgroundColor:
                               (pwStrength.label === 'Weak' && i === 1) ||
-                              (pwStrength.label === 'Fair' && i <= 2) ||
-                              (pwStrength.label === 'Strong')
+                                (pwStrength.label === 'Fair' && i <= 2) ||
+                                (pwStrength.label === 'Strong')
                                 ? pwStrength.color
                                 : C.GRAY200,
                           },
