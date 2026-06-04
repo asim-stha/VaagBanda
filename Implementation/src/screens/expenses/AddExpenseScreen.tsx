@@ -1,112 +1,56 @@
-
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  Modal,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
+  KeyboardAvoidingView, Platform, StatusBar, SafeAreaView, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
-const COLORS = {
-  CRIMSON: '#DC143C',
-  CRIMSON_DARK: '#A01030',
-  BLUE: '#1A2B5F',
-  BLUE_DARK: '#0F1F4A',
-  BLUE_MID: '#2B3F75',
-  WHITE: '#FFFFFF',
-  GHOST: '#F7F8FB',
-  GRAY100: '#EEF1F6',
-  GRAY200: '#E1E5EE',
-  GRAY400: '#9AA3B5',
-  GRAY600: '#5A6478',
-  GRAY800: '#1F2A44',
-  SUCCESS: '#27AE60',
-  WARN: '#F39C12',
+const C = {
+  CRIMSON: '#DC143C', CRIMSON_DARK: '#A01030',
+  BLUE: '#1A2B5F', BLUE_DARK: '#0F1F4A',
+  WHITE: '#FFFFFF', GHOST: '#F7F8FB',
+  GRAY200: '#E1E5EE', GRAY400: '#9AA3B5',
+  GRAY600: '#5A6478', GRAY800: '#1F2A44',
+  SUCCESS: '#27AE60', WARN: '#F39C12', ERROR: '#E74C3C',
 };
 
 /* ─── ICONS ────────────────────────────────────────────────── */
-type IconName = 'back' | 'check' | 'chevron' | 'tag' | 'calendar' | 'camera' | 'lock';
-
-const Icon = ({
-  name, size = 18, color = COLORS.GRAY400,
-}: { name: IconName; size?: number; color?: string }) => {
-  const props = {
-    width: size, height: size, viewBox: '0 0 24 24',
-    fill: 'none', stroke: color, strokeWidth: 2,
+const Icon = ({ name, size = 18, color = C.GRAY400 }: {
+  name: string; size?: number; color?: string;
+}) => {
+  const p = {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: color, strokeWidth: 2,
     strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
   };
-  switch (name) {
-    case 'back':
-      return (
-        <Svg {...props}>
-          <Line x1="19" y1="12" x2="5" y2="12" />
-          <Polyline points="12 19 5 12 12 5" />
-        </Svg>
-      );
-    case 'check':
-      return (
-        <Svg {...props}>
-          <Polyline points="20 6 9 17 4 12" />
-        </Svg>
-      );
-    case 'chevron':
-      return (
-        <Svg {...props}>
-          <Polyline points="9 18 15 12 9 6" />
-        </Svg>
-      );
-    case 'tag':
-      return (
-        <Svg {...props}>
-          <Path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
-          <Line x1="7" y1="7" x2="7.01" y2="7" />
-        </Svg>
-      );
-    case 'calendar':
-      return (
-        <Svg {...props}>
-          <Path d="M3 6h18M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M8 2v4M16 2v4" />
-        </Svg>
-      );
-    case 'camera':
-      return (
-        <Svg {...props}>
-          <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-          <Circle cx="12" cy="13" r="4" />
-        </Svg>
-      );
-    case 'lock':
-      return (
-        <Svg {...props}>
-          <Path d="M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4" />
-        </Svg>
-      );
-    default: return null;
-  }
+  if (name === 'back') return <Svg {...p}><Line x1="19" y1="12" x2="5" y2="12" /><Polyline points="12 19 5 12 12 5" /></Svg>;
+  if (name === 'check') return <Svg {...p}><Polyline points="20 6 9 17 4 12" /></Svg>;
+  if (name === 'chevron') return <Svg {...p}><Polyline points="9 18 15 12 9 6" /></Svg>;
+  if (name === 'tag') return <Svg {...p}><Path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" /><Line x1="7" y1="7" x2="7.01" y2="7" /></Svg>;
+  if (name === 'camera') return <Svg {...p}><Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><Circle cx="12" cy="13" r="4" /></Svg>;
+  if (name === 'lock') return <Svg {...p}><Path d="M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4" /></Svg>;
+  return null;
 };
 
-/* ─── HELPERS ──────────────────────────────────────────────── */
-/** Format a number with thousands separators and 2 decimals */
-const fmt = (n: number) => n.toLocaleString('en-US', {
-  minimumFractionDigits: 2, maximumFractionDigits: 2,
-});
+/* ─── MONEY HELPERS (integer cents — avoids floating-point drift) ─── */
+/** Parse "8000.50" → 800050 cents */
+const toCents = (s: string): number => {
+  const n = parseFloat(s.replace(/,/g, ''));
+  if (isNaN(n) || n < 0) return 0;
+  return Math.round(n * 100);
+};
 
-/** Round to 2 decimals reliably (avoids floating-point drift per SRS §5.5) */
-const round2 = (n: number) => Math.round(n * 100) / 100;
+/** 800050 → "8,000.50" */
+const fromCents = (c: number): string =>
+  (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/* ─── DOMAIN TYPES ─────────────────────────────────────────── */
-interface Member {
+/** Display helper */
+const fmt = (n: number) => fromCents(Math.round(Math.abs(n) * 100));
+
+/* ─── TYPES ────────────────────────────────────────────────── */
+export interface Member {
   id: string;
   name: string;
   avatarColor: string;
@@ -114,306 +58,321 @@ interface Member {
 
 type SplitMethod = 'equal' | 'exact' | 'percent' | 'shares';
 
-interface CategoryOption {
-  key: string;
-  emoji: string;
-  label: string;
+export interface ExpensePayload {
+  description: string;
+  amount: number;          // in the group's currency unit
+  paidBy: string;          // member id
+  category: string;
+  splitMethod: SplitMethod;
+  participants: string[];  // member ids
+  shares: Record<string, number>; // memberId → amount owed (in currency unit)
 }
 
-const CATEGORIES: CategoryOption[] = [
-  { key: 'food',      emoji: '🍽️', label: 'Food' },
+/* ─── CATEGORIES ───────────────────────────────────────────── */
+const CATEGORIES = [
+  { key: 'food', emoji: '🍽️', label: 'Food' },
   { key: 'transport', emoji: '🚕', label: 'Transport' },
-  { key: 'hotel',     emoji: '🏨', label: 'Stay' },
-  { key: 'tickets',   emoji: '🎟️', label: 'Tickets' },
-  { key: 'shopping',  emoji: '🛍️', label: 'Shopping' },
-  { key: 'fuel',      emoji: '⛽', label: 'Fuel' },
-  { key: 'utility',   emoji: '🧾', label: 'Utility' },
-  { key: 'other',     emoji: '📦', label: 'Other' },
+  { key: 'hotel', emoji: '🏨', label: 'Stay' },
+  { key: 'tickets', emoji: '🎟️', label: 'Tickets' },
+  { key: 'shopping', emoji: '🛍️', label: 'Shopping' },
+  { key: 'fuel', emoji: '⛽', label: 'Fuel' },
+  { key: 'utility', emoji: '🧾', label: 'Utility' },
+  { key: 'other', emoji: '📦', label: 'Other' },
 ];
 
-
 /* ─── AVATAR ───────────────────────────────────────────────── */
-const Avatar = ({
-  member, size = 36,
-}: { member: Member; size?: number }) => (
-  <View style={[styles.avatar, {
-    width: size, height: size, borderRadius: size / 2,
-    backgroundColor: member.avatarColor,
+const Avatar = ({ member, size = 36 }: { member: Member; size?: number }) => (
+  <View style={[s.avatar, {
+    width: size, height: size, borderRadius: size / 2, backgroundColor: member.avatarColor,
   }]}>
-    <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>
+    <Text style={[s.avatarText, { fontSize: size * 0.4 }]}>
       {member.name.charAt(0).toUpperCase()}
     </Text>
   </View>
 );
 
 /* ─── PROPS ────────────────────────────────────────────────── */
-interface AddExpenseScreenProps {
-  groupName?: string;
-  groupCurrency?: string;
-  members?: Member[];
-  myUserId?: string;
+interface Props {
+  groupName: string;
+  groupCurrency: string;
+  members: Member[];       // required — no defaults
+  myUserId: string;
   onBack?: () => void;
-  onSave?: (expense: {
-    amount: number;
-    description: string;
-    paidBy: string;
-    category: string;
-    splitMethod: SplitMethod;
-    participants: string[]; // member ids
-    shares: { [memberId: string]: number }; // each person's owed amount
-  }) => void;
+  onSave?: (expense: ExpensePayload) => void;
 }
 
 /* ─── MAIN SCREEN ──────────────────────────────────────────── */
-const AddExpenseScreen: React.FC<AddExpenseScreenProps> = ({
-  groupName = '',
-  groupCurrency = 'NPR',
-  members = [],
-  myUserId = '',
-  onBack,
-  onSave,
+const AddExpenseScreen: React.FC<Props> = ({
+  groupName, groupCurrency, members, myUserId, onBack, onSave,
 }) => {
-  // ── State ──
-  const [amount, setAmount] = useState('');
+  /* ── Form state ── */
+  const [amountRaw, setAmountRaw] = useState('');
   const [description, setDescription] = useState('');
   const [paidBy, setPaidBy] = useState(myUserId);
   const [category, setCategory] = useState('food');
-  const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
+  const [method, setMethod] = useState<SplitMethod>('equal');
   const [participants, setParticipants] = useState<string[]>(members.map(m => m.id));
-  const [showPayerPicker, setShowPayerPicker] = useState(false);
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showPayerModal, setShowPayerModal] = useState(false);
+  const [showCatModal, setShowCatModal] = useState(false);
 
-  // ── Derived ──
-  const amountNum = useMemo(() => {
-    const parsed = parseFloat(amount.replace(/,/g, ''));
-    return isNaN(parsed) ? 0 : parsed;
-  }, [amount]);
+  /* Per-person input maps for exact / percent / shares */
+  const [exactInputs, setExactInputs] = useState<Record<string, string>>({});
+  const [percentInputs, setPercentInputs] = useState<Record<string, string>>({});
+  const [shareInputs, setShareInputs] = useState<Record<string, string>>({});
 
-  /** Per-SRS §4.3.3 equal split: divide evenly; payer absorbs the rounding remainder. */
-  const shares = useMemo((): { [memberId: string]: number } => {
-    if (splitMethod !== 'equal' || participants.length === 0 || amountNum <= 0) {
-      return {};
+  /* ── Derived: total in cents ── */
+  const totalCents = useMemo(() => toCents(amountRaw), [amountRaw]);
+
+  /* ── Computed shares (in cents) for each method ── */
+  const computedSharesCents = useMemo((): Record<string, number> => {
+    if (totalCents === 0 || participants.length === 0) return {};
+    const active = participants; // ids
+
+    if (method === 'equal') {
+      const base = Math.floor(totalCents / active.length);
+      const remainder = totalCents - base * active.length;
+      const out: Record<string, number> = {};
+      active.forEach(id => { out[id] = base; });
+      // Remainder goes to payer if they're a participant, else first participant
+      const remainderTarget = active.includes(paidBy) ? paidBy : active[0];
+      out[remainderTarget] += remainder;
+      return out;
     }
-    const baseShare = round2(amountNum / participants.length);
-    const distributed = round2(baseShare * participants.length);
-    const remainder = round2(amountNum - distributed);
 
-    const out: { [memberId: string]: number } = {};
-    participants.forEach(pid => {
-      out[pid] = baseShare;
-    });
-    // Assign rounding remainder to payer (per SRS §4.3.3)
-    if (remainder !== 0 && out[paidBy] !== undefined) {
-      out[paidBy] = round2(out[paidBy] + remainder);
-    } else if (remainder !== 0) {
-      // Payer not a participant — give remainder to first participant
-      out[participants[0]] = round2(out[participants[0]] + remainder);
+    if (method === 'exact') {
+      const out: Record<string, number> = {};
+      active.forEach(id => { out[id] = toCents(exactInputs[id] ?? '0'); });
+      return out;
     }
-    return out;
-  }, [splitMethod, participants, amountNum, paidBy]);
 
-  const sharesSum = useMemo(
-    () => Object.values(shares).reduce((acc, v) => acc + v, 0),
-    [shares]
-  );
+    if (method === 'percent') {
+      const out: Record<string, number> = {};
+      active.forEach(id => {
+        const pct = parseFloat(percentInputs[id] ?? '0') || 0;
+        out[id] = Math.round(totalCents * pct / 100);
+      });
+      // Distribute rounding error to payer
+      const distributed = Object.values(out).reduce((a, b) => a + b, 0);
+      const diff = totalCents - distributed;
+      if (diff !== 0) {
+        const target = active.includes(paidBy) ? paidBy : active[0];
+        out[target] = (out[target] ?? 0) + diff;
+      }
+      return out;
+    }
 
-  const splitMatchesTotal = useMemo(
-    () => Math.abs(sharesSum - amountNum) < 0.01,
-    [sharesSum, amountNum]
-  );
+    if (method === 'shares') {
+      const unitMap: Record<string, number> = {};
+      active.forEach(id => {
+        unitMap[id] = Math.max(0, parseFloat(shareInputs[id] ?? '1') || 0);
+      });
+      const totalUnits = Object.values(unitMap).reduce((a, b) => a + b, 0);
+      if (totalUnits === 0) return {};
+      const out: Record<string, number> = {};
+      active.forEach(id => {
+        out[id] = Math.floor(totalCents * unitMap[id] / totalUnits);
+      });
+      const distributed = Object.values(out).reduce((a, b) => a + b, 0);
+      const diff = totalCents - distributed;
+      if (diff !== 0) {
+        const target = active.includes(paidBy) ? paidBy : active[0];
+        out[target] = (out[target] ?? 0) + diff;
+      }
+      return out;
+    }
 
-  const canSave = (
-    amountNum > 0 &&
-    description.trim().length > 0 &&
-    participants.length > 0 &&
-    splitMatchesTotal
-  );
+    return {};
+  }, [method, totalCents, participants, paidBy, exactInputs, percentInputs, shareInputs]);
 
-  const paidByMember = members.find(m => m.id === paidBy) ?? members[0];
-  const selectedCategory = CATEGORIES.find(c => c.key === category) ?? CATEGORIES[0];
+  /* ── Validation ── */
+  const sumCents = useMemo(() => Object.values(computedSharesCents).reduce((a, b) => a + b, 0), [computedSharesCents]);
+  const splitValid = Math.abs(sumCents - totalCents) <= 1 && participants.length > 0;
 
-  // ── Handlers ──
-  const toggleParticipant = (id: string) => {
+  const percentSum = useMemo(() => {
+    if (method !== 'percent') return 100;
+    return participants.reduce((a, id) => a + (parseFloat(percentInputs[id] ?? '0') || 0), 0);
+  }, [method, participants, percentInputs]);
+
+  const canSave = totalCents > 0 && description.trim().length > 0 && participants.length > 0 && splitValid;
+
+  /* ── Handlers ── */
+  const handleAmountChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return;
+    if (parts[1] && parts[1].length > 2) return;
+    setAmountRaw(cleaned);
+  };
+
+  const toggleParticipant = useCallback((id: string) => {
     setParticipants(prev =>
       prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
     );
+  }, []);
+
+  const handleMethodChange = (m: SplitMethod) => {
+    setMethod(m);
+    // Pre-fill inputs with sensible defaults when switching
+    if (m === 'shares') {
+      const defaults: Record<string, string> = {};
+      participants.forEach(id => { defaults[id] = shareInputs[id] ?? '1'; });
+      setShareInputs(defaults);
+    }
+    if (m === 'percent') {
+      const equalPct = participants.length > 0
+        ? (100 / participants.length).toFixed(1)
+        : '0';
+      const defaults: Record<string, string> = {};
+      participants.forEach(id => { defaults[id] = percentInputs[id] ?? equalPct; });
+      setPercentInputs(defaults);
+    }
   };
 
   const handleSave = () => {
     if (!canSave) return;
+    const sharesInCurrency: Record<string, number> = {};
+    Object.entries(computedSharesCents).forEach(([id, c]) => {
+      sharesInCurrency[id] = c / 100;
+    });
     onSave?.({
-      amount: amountNum,
       description: description.trim(),
+      amount: totalCents / 100,
       paidBy,
       category,
-      splitMethod,
+      splitMethod: method,
       participants,
-      shares,
+      shares: sharesInCurrency,
     });
   };
 
-  // Format amount as user types (basic input filtering — allow digits + one dot)
-  const handleAmountChange = (text: string) => {
-    const cleaned = text.replace(/[^0-9.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length > 2) return; // ignore extra dots
-    if (parts[1] && parts[1].length > 2) return; // max 2 decimals
-    setAmount(cleaned);
+  /* ── Lookups ── */
+  const paidByMember = members.find(m => m.id === paidBy) ?? members[0];
+  const selectedCat = CATEGORIES.find(c => c.key === category) ?? CATEGORIES[0];
+  const activeParts = members.filter(m => participants.includes(m.id));
+
+  /* ── Summary indicator text ── */
+  const indicatorText = () => {
+    if (totalCents === 0) return null;
+    if (participants.length === 0) return { text: 'Select at least one participant', color: C.ERROR };
+
+    if (method === 'percent') {
+      const diff = 100 - percentSum;
+      if (Math.abs(diff) > 0.1) return {
+        text: `Percentages sum to ${percentSum.toFixed(1)}% — need ${diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)}% more`,
+        color: C.WARN,
+      };
+    }
+    if (method === 'exact') {
+      const diff = totalCents - sumCents;
+      if (Math.abs(diff) > 1) return {
+        text: `Amounts sum to ${fromCents(sumCents)} — ${diff > 0 ? `${fromCents(diff)} unallocated` : `${fromCents(-diff)} over`}`,
+        color: diff > 0 ? C.WARN : C.ERROR,
+      };
+    }
+    if (splitValid) return { text: `✓ Splits sum to ${fromCents(totalCents)} ${groupCurrency}`, color: C.SUCCESS };
+    return null;
   };
+  const indicator = indicatorText();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+    <SafeAreaView style={s.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={C.BLUE_DARK} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          style={styles.scroll}
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* ─── HEADER ─── */}
-          <LinearGradient
-            colors={[COLORS.BLUE_DARK, COLORS.BLUE]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
-            <View style={styles.blob} />
-
-            <View style={styles.topRow}>
-              <TouchableOpacity
-                onPress={onBack}
-                activeOpacity={0.7}
-                style={styles.iconBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Icon name="back" size={18} color={COLORS.WHITE} />
+          <LinearGradient colors={[C.BLUE_DARK, C.BLUE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.header}>
+            <View style={s.topRow}>
+              <TouchableOpacity onPress={onBack} activeOpacity={0.7} style={s.iconBtn}>
+                <Icon name="back" size={18} color={C.WHITE} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Add Expense</Text>
-              <TouchableOpacity
-                onPress={handleSave}
-                disabled={!canSave}
-                activeOpacity={0.7}
-                style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Text style={[styles.saveBtnText, !canSave && styles.saveBtnTextDisabled]}>
-                  Save
-                </Text>
+              <Text style={s.headerTitle}>Add Expense</Text>
+              <TouchableOpacity onPress={handleSave} disabled={!canSave} activeOpacity={0.7}
+                style={[s.saveBtn, !canSave && s.saveBtnOff]}>
+                <Text style={[s.saveBtnText, !canSave && s.saveBtnTextOff]}>Save</Text>
               </TouchableOpacity>
             </View>
+            <Text style={s.headerSub}>in {groupName}</Text>
 
-            <Text style={styles.groupContext} numberOfLines={1}>
-              in {groupName}
-            </Text>
-
-            {/* Amount input — the focal point */}
-            <View style={styles.amountWrap}>
-              <Text style={styles.currencyLabel}>{groupCurrency}</Text>
+            {/* Amount */}
+            <View style={s.amountRow}>
+              <Text style={s.currLabel}>{groupCurrency}</Text>
               <TextInput
-                value={amount}
+                value={amountRaw}
                 onChangeText={handleAmountChange}
                 placeholder="0.00"
-                placeholderTextColor="rgba(255,255,255,0.40)"
+                placeholderTextColor="rgba(255,255,255,0.35)"
                 keyboardType="decimal-pad"
-                style={styles.amountInput}
-                maxLength={12}
+                style={s.amountInput}
+                maxLength={13}
               />
             </View>
           </LinearGradient>
 
           {/* ─── SHEET ─── */}
-          <View style={styles.sheet}>
-            {/* ── Description ── */}
-            <Text style={styles.label}>Description</Text>
-            <View style={styles.field}>
+          <View style={s.sheet}>
+
+            {/* Description */}
+            <Text style={s.label}>DESCRIPTION</Text>
+            <View style={s.field}>
               <TextInput
                 value={description}
                 onChangeText={setDescription}
                 placeholder="What was this for?"
-                placeholderTextColor={COLORS.GRAY400}
-                style={styles.fieldInput}
+                placeholderTextColor={C.GRAY400}
+                style={s.fieldInput}
                 maxLength={80}
               />
             </View>
 
-            {/* ── Paid By + Category row ── */}
-            <View style={styles.row}>
-              <View style={styles.rowItem}>
-                <Text style={styles.label}>Paid by</Text>
-                <TouchableOpacity
-                  onPress={() => setShowPayerPicker(true)}
-                  activeOpacity={0.7}
-                  style={styles.pickerField}
-                >
-                  <Avatar member={paidByMember} size={28} />
-                  <Text style={styles.pickerText} numberOfLines={1}>
+            {/* Paid by + Category row */}
+            <View style={s.twoCol}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>PAID BY</Text>
+                <TouchableOpacity onPress={() => setShowPayerModal(true)} activeOpacity={0.7} style={s.pickerBtn}>
+                  <Avatar member={paidByMember} size={26} />
+                  <Text style={s.pickerText} numberOfLines={1}>
                     {paidBy === myUserId ? 'You' : paidByMember.name}
                   </Text>
-                  <Icon name="chevron" size={14} color={COLORS.GRAY400} />
+                  <Icon name="chevron" size={13} color={C.GRAY400} />
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.rowItem}>
-                <Text style={styles.label}>Category</Text>
-                <TouchableOpacity
-                  onPress={() => setShowCategoryPicker(true)}
-                  activeOpacity={0.7}
-                  style={styles.pickerField}
-                >
-                  <Text style={styles.categoryEmoji}>{selectedCategory.emoji}</Text>
-                  <Text style={styles.pickerText} numberOfLines={1}>
-                    {selectedCategory.label}
-                  </Text>
-                  <Icon name="chevron" size={14} color={COLORS.GRAY400} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>CATEGORY</Text>
+                <TouchableOpacity onPress={() => setShowCatModal(true)} activeOpacity={0.7} style={s.pickerBtn}>
+                  <Text style={{ fontSize: 18 }}>{selectedCat.emoji}</Text>
+                  <Text style={s.pickerText} numberOfLines={1}>{selectedCat.label}</Text>
+                  <Icon name="chevron" size={13} color={C.GRAY400} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* ── Receipt placeholder (Increment 3) ── */}
-            <TouchableOpacity activeOpacity={0.7} style={styles.receiptBtn} disabled>
-              <Icon name="camera" size={18} color={COLORS.GRAY400} />
-              <Text style={styles.receiptBtnText}>Attach receipt</Text>
-              <View style={styles.comingSoonPill}>
-                <Text style={styles.comingSoonText}>Coming in v3</Text>
-              </View>
+            {/* Receipt (locked until Increment 3) */}
+            <TouchableOpacity disabled activeOpacity={0.7} style={s.receiptRow}>
+              <Icon name="camera" size={16} color={C.GRAY400} />
+              <Text style={s.receiptText}>Attach receipt</Text>
+              <View style={s.lockedPill}><Text style={s.lockedText}>Increment 3</Text></View>
             </TouchableOpacity>
 
             {/* ── Split Method Tabs ── */}
-            <Text style={[styles.label, { marginTop: 22 }]}>Split method</Text>
-            <View style={styles.splitTabs}>
+            <Text style={[s.label, { marginTop: 20 }]}>SPLIT METHOD</Text>
+            <View style={s.methodTabs}>
               {(['equal', 'exact', 'percent', 'shares'] as SplitMethod[]).map(m => {
-                const active = splitMethod === m;
-                const locked = m !== 'equal'; // only equal works in Increment 1
+                const active = method === m;
                 const labels: Record<SplitMethod, string> = {
-                  equal:   'Equal',
-                  exact:   'Exact',
-                  percent: 'Percent',
-                  shares:  'Shares',
+                  equal: 'Equal', exact: 'Exact', percent: '%', shares: 'Shares',
                 };
                 return (
                   <TouchableOpacity
                     key={m}
-                    onPress={() => !locked && setSplitMethod(m)}
-                    activeOpacity={locked ? 1 : 0.7}
-                    disabled={locked}
-                    style={[
-                      styles.splitTab,
-                      active && styles.splitTabActive,
-                      locked && styles.splitTabLocked,
-                    ]}
+                    onPress={() => handleMethodChange(m)}
+                    activeOpacity={0.7}
+                    style={[s.methodTab, active && s.methodTabActive]}
                   >
-                    {locked && (
-                      <Icon name="lock" size={10} color={COLORS.GRAY400} />
-                    )}
-                    <Text style={[
-                      styles.splitTabText,
-                      active && styles.splitTabTextActive,
-                      locked && styles.splitTabTextLocked,
-                    ]}>
+                    <Text style={[s.methodTabText, active && s.methodTabTextActive]}>
                       {labels[m]}
                     </Text>
                   </TouchableOpacity>
@@ -421,93 +380,137 @@ const AddExpenseScreen: React.FC<AddExpenseScreenProps> = ({
               })}
             </View>
 
-            {/* ── Participant List ── */}
-            <View style={styles.participantsHeader}>
-              <Text style={styles.label}>Split between</Text>
-              <Text style={styles.participantsCount}>
-                {participants.length} of {members.length}
-              </Text>
+            {/* Method description */}
+            <Text style={s.methodDesc}>
+              {method === 'equal' && 'Divide total evenly. Rounding goes to payer.'}
+              {method === 'exact' && 'Enter the exact amount each person owes.'}
+              {method === 'percent' && 'Enter each person\'s percentage share. Must total 100%.'}
+              {method === 'shares' && 'Enter share units (e.g. 2, 1, 1). Amounts are calculated proportionally.'}
+            </Text>
+
+            {/* ── Participants ── */}
+            <View style={s.partHeader}>
+              <Text style={s.label}>SPLIT BETWEEN</Text>
+              <Text style={s.partCount}>{participants.length} / {members.length}</Text>
             </View>
 
-            <View style={styles.participantList}>
+            <View style={s.partList}>
               {members.map((m, idx) => {
-                const isParticipant = participants.includes(m.id);
-                const share = shares[m.id] ?? 0;
+                const isActive = participants.includes(m.id);
                 const isLast = idx === members.length - 1;
+                const shareCents = computedSharesCents[m.id] ?? 0;
+
                 return (
-                  <TouchableOpacity
+                  <View
                     key={m.id}
-                    onPress={() => toggleParticipant(m.id)}
-                    activeOpacity={0.7}
-                    style={[
-                      styles.participantRow,
-                      !isLast && styles.participantRowBorder,
-                    ]}
+                    style={[s.partRow, !isLast && s.partRowBorder]}
                   >
-                    <Avatar member={m} size={36} />
-                    <View style={styles.participantInfo}>
-                      <Text style={styles.participantName}>
-                        {m.id === myUserId ? 'You' : m.name}
-                      </Text>
-                      {isParticipant && amountNum > 0 && (
-                        <Text style={styles.participantShare}>
-                          Owes {fmt(share)} {groupCurrency}
+                    {/* Checkbox — tap to toggle */}
+                    <TouchableOpacity onPress={() => toggleParticipant(m.id)} activeOpacity={0.7}
+                      style={[s.checkbox, isActive && s.checkboxActive]}>
+                      {isActive && <Icon name="check" size={12} color={C.WHITE} />}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => toggleParticipant(m.id)}
+                      activeOpacity={0.7}
+                      style={s.partInfo}
+                    >
+                      <Avatar member={m} size={36} />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[s.partName, !isActive && s.partNameOff]}>
+                          {m.id === myUserId ? 'You' : m.name}
                         </Text>
-                      )}
-                    </View>
-                    <View style={[
-                      styles.checkbox,
-                      isParticipant && styles.checkboxChecked,
-                    ]}>
-                      {isParticipant && (
-                        <Icon name="check" size={12} color={COLORS.WHITE} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
+                        {isActive && totalCents > 0 && method === 'equal' && (
+                          <Text style={s.partShare}>
+                            Owes {fromCents(shareCents)} {groupCurrency}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Right-side input — only shown when participant is active */}
+                    {isActive && (
+                      <>
+                        {method === 'exact' && (
+                          <TextInput
+                            value={exactInputs[m.id] ?? ''}
+                            onChangeText={v => {
+                              const cleaned = v.replace(/[^0-9.]/g, '');
+                              setExactInputs(prev => ({ ...prev, [m.id]: cleaned }));
+                            }}
+                            placeholder="0.00"
+                            placeholderTextColor={C.GRAY400}
+                            keyboardType="decimal-pad"
+                            style={s.inlineInput}
+                            maxLength={10}
+                          />
+                        )}
+                        {method === 'percent' && (
+                          <View style={s.inlineInputWrap}>
+                            <TextInput
+                              value={percentInputs[m.id] ?? ''}
+                              onChangeText={v => {
+                                const cleaned = v.replace(/[^0-9.]/g, '');
+                                setPercentInputs(prev => ({ ...prev, [m.id]: cleaned }));
+                              }}
+                              placeholder="0"
+                              placeholderTextColor={C.GRAY400}
+                              keyboardType="decimal-pad"
+                              style={[s.inlineInput, { paddingRight: 22 }]}
+                              maxLength={5}
+                            />
+                            <Text style={s.inlineUnit}>%</Text>
+                          </View>
+                        )}
+                        {method === 'shares' && (
+                          <View style={s.inlineInputWrap}>
+                            <TextInput
+                              value={shareInputs[m.id] ?? '1'}
+                              onChangeText={v => {
+                                const cleaned = v.replace(/[^0-9.]/g, '');
+                                setShareInputs(prev => ({ ...prev, [m.id]: cleaned }));
+                              }}
+                              placeholder="1"
+                              placeholderTextColor={C.GRAY400}
+                              keyboardType="decimal-pad"
+                              style={s.inlineInput}
+                              maxLength={4}
+                            />
+                            {/* Show calculated amount below the unit input */}
+                          </View>
+                        )}
+                        {/* Computed amount shown for percent/shares */}
+                        {(method === 'percent' || method === 'shares') && totalCents > 0 && shareCents > 0 && (
+                          <Text style={s.computedAmount}>
+                            = {fromCents(shareCents)}
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </View>
                 );
               })}
             </View>
 
-            {/* ── Split Sum Indicator (SRS §5.5 Business Rule) ── */}
-            {amountNum > 0 && participants.length > 0 && (
-              <View style={[
-                styles.sumIndicator,
-                splitMatchesTotal ? styles.sumOk : styles.sumWarn,
-              ]}>
-                <Icon
-                  name={splitMatchesTotal ? 'check' : 'tag'}
-                  size={14}
-                  color={splitMatchesTotal ? COLORS.SUCCESS : COLORS.WARN}
-                />
-                <Text style={[
-                  styles.sumText,
-                  { color: splitMatchesTotal ? COLORS.SUCCESS : COLORS.WARN },
-                ]}>
-                  Splits sum to {fmt(sharesSum)} / {fmt(amountNum)} {groupCurrency}
-                  {splitMatchesTotal ? ' ✓' : ''}
+            {/* ── Sum indicator (SRS §5.5) ── */}
+            {indicator && (
+              <View style={[s.indicator, { backgroundColor: indicator.color + '15' }]}>
+                <Text style={[s.indicatorText, { color: indicator.color }]}>
+                  {indicator.text}
                 </Text>
               </View>
             )}
 
-            {/* ── Save Button (also at the bottom for easy reach) ── */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleSave}
-              disabled={!canSave}
-              style={{ marginTop: 22 }}
-            >
+            {/* ── Save button ── */}
+            <TouchableOpacity activeOpacity={0.85} onPress={handleSave} disabled={!canSave} style={{ marginTop: 22 }}>
               {canSave ? (
-                <LinearGradient
-                  colors={[COLORS.CRIMSON, COLORS.CRIMSON_DARK]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.bottomBtn}
-                >
-                  <Text style={styles.bottomBtnText}>Save Expense</Text>
+                <LinearGradient colors={[C.CRIMSON, C.CRIMSON_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.saveFullBtn}>
+                  <Text style={s.saveFullBtnText}>Save Expense</Text>
                 </LinearGradient>
               ) : (
-                <View style={[styles.bottomBtn, styles.bottomBtnDisabled]}>
-                  <Text style={styles.bottomBtnTextDisabled}>Save Expense</Text>
+                <View style={[s.saveFullBtn, s.saveFullBtnOff]}>
+                  <Text style={s.saveFullBtnTextOff}>Save Expense</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -516,45 +519,25 @@ const AddExpenseScreen: React.FC<AddExpenseScreenProps> = ({
       </KeyboardAvoidingView>
 
       {/* ─── PAYER PICKER MODAL ─── */}
-      <Modal
-        visible={showPayerPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPayerPicker(false)}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowPayerPicker(false)}
-          style={styles.modalBackdrop}
-        >
-          <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Who paid?</Text>
-            {members.map((m, idx) => {
-              const selected = m.id === paidBy;
+      <Modal visible={showPayerModal} transparent animationType="fade" onRequestClose={() => setShowPayerModal(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setShowPayerModal(false)} style={s.backdrop}>
+          <TouchableOpacity activeOpacity={1} style={s.bottomSheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>Who paid?</Text>
+            {members.map((m, i) => {
+              const sel = m.id === paidBy;
               return (
                 <TouchableOpacity
                   key={m.id}
-                  onPress={() => {
-                    setPaidBy(m.id);
-                    setShowPayerPicker(false);
-                  }}
+                  onPress={() => { setPaidBy(m.id); setShowPayerModal(false); }}
                   activeOpacity={0.7}
-                  style={[
-                    styles.modalRow,
-                    idx !== members.length - 1 && styles.modalRowBorder,
-                  ]}
+                  style={[s.sheetRow, i < members.length - 1 && s.sheetRowBorder]}
                 >
-                  <Avatar member={m} size={36} />
-                  <Text style={[
-                    styles.modalRowText,
-                    selected && { color: COLORS.CRIMSON, fontWeight: '700' },
-                  ]}>
+                  <Avatar member={m} size={38} />
+                  <Text style={[s.sheetRowText, sel && s.sheetRowTextSel]}>
                     {m.id === myUserId ? 'You' : m.name}
                   </Text>
-                  {selected && (
-                    <Icon name="check" size={18} color={COLORS.CRIMSON} />
-                  )}
+                  {sel && <Icon name="check" size={18} color={C.CRIMSON} />}
                 </TouchableOpacity>
               );
             })}
@@ -563,43 +546,23 @@ const AddExpenseScreen: React.FC<AddExpenseScreenProps> = ({
       </Modal>
 
       {/* ─── CATEGORY PICKER MODAL ─── */}
-      <Modal
-        visible={showCategoryPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCategoryPicker(false)}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowCategoryPicker(false)}
-          style={styles.modalBackdrop}
-        >
-          <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Choose a category</Text>
-            <View style={styles.categoryGrid}>
-              {CATEGORIES.map(c => {
-                const selected = c.key === category;
+      <Modal visible={showCatModal} transparent animationType="fade" onRequestClose={() => setShowCatModal(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setShowCatModal(false)} style={s.backdrop}>
+          <TouchableOpacity activeOpacity={1} style={s.bottomSheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>Choose category</Text>
+            <View style={s.catGrid}>
+              {CATEGORIES.map(cat => {
+                const sel = cat.key === category;
                 return (
                   <TouchableOpacity
-                    key={c.key}
-                    onPress={() => {
-                      setCategory(c.key);
-                      setShowCategoryPicker(false);
-                    }}
+                    key={cat.key}
+                    onPress={() => { setCategory(cat.key); setShowCatModal(false); }}
                     activeOpacity={0.7}
-                    style={[
-                      styles.categoryTile,
-                      selected && styles.categoryTileSelected,
-                    ]}
+                    style={[s.catTile, sel && s.catTileSel]}
                   >
-                    <Text style={styles.categoryTileEmoji}>{c.emoji}</Text>
-                    <Text style={[
-                      styles.categoryTileLabel,
-                      selected && { color: COLORS.CRIMSON, fontWeight: '700' },
-                    ]}>
-                      {c.label}
-                    </Text>
+                    <Text style={s.catEmoji}>{cat.emoji}</Text>
+                    <Text style={[s.catTileLabel, sel && s.catTileLabelSel]}>{cat.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -612,425 +575,92 @@ const AddExpenseScreen: React.FC<AddExpenseScreenProps> = ({
 };
 
 /* ─── STYLES ───────────────────────────────────────────────── */
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.GHOST },
-  scroll: { flex: 1 },
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.GHOST },
 
   /* HEADER */
-  header: {
-    paddingTop: 20,
-    paddingHorizontal: 24,
-    paddingBottom: 30,
-    overflow: 'hidden',
-  },
-  blob: {
-    position: 'absolute',
-    top: -40, right: -40,
-    width: 160, height: 160,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(220,20,60,0.18)',
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  iconBtn: {
-    width: 36, height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: COLORS.WHITE,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  saveBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: COLORS.CRIMSON,
-  },
-  saveBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  saveBtnText: {
-    color: COLORS.WHITE,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  saveBtnTextDisabled: {
-    color: 'rgba(255,255,255,0.50)',
-  },
-  groupContext: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-
-  /* AMOUNT INPUT */
-  amountWrap: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    marginTop: 18,
-    gap: 8,
-  },
-  currencyLabel: {
-    color: 'rgba(255,255,255,0.70)',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  amountInput: {
-    color: COLORS.WHITE,
-    fontSize: 46,
-    fontWeight: '800',
-    letterSpacing: -1,
-    padding: 0,
-    minWidth: 100,
-    textAlign: 'left',
-  },
+  header: { paddingTop: 20, paddingHorizontal: 24, paddingBottom: 28, overflow: 'hidden' },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: C.WHITE, fontSize: 16, fontWeight: '700' },
+  saveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: C.CRIMSON },
+  saveBtnOff: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  saveBtnText: { color: C.WHITE, fontSize: 13, fontWeight: '700' },
+  saveBtnTextOff: { color: 'rgba(255,255,255,0.45)' },
+  headerSub: { color: 'rgba(255,255,255,0.70)', fontSize: 12, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
+  amountRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', marginTop: 16, gap: 8 },
+  currLabel: { color: 'rgba(255,255,255,0.65)', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  amountInput: { color: C.WHITE, fontSize: 48, fontWeight: '800', letterSpacing: -1, padding: 0, minWidth: 80, textAlign: 'left' },
 
   /* SHEET */
-  sheet: {
-    backgroundColor: COLORS.WHITE,
-    marginTop: -16,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 24,
-    flex: 1,
-  },
+  sheet: { backgroundColor: C.WHITE, marginTop: -16, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 22, paddingTop: 24, paddingBottom: 24 },
+  label: { fontSize: 11, fontWeight: '700', color: C.GRAY600, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  field: { borderWidth: 1.5, borderColor: C.GRAY200, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14, backgroundColor: C.WHITE },
+  fieldInput: { fontSize: 15, color: C.GRAY800, fontWeight: '500', padding: 0 },
+  twoCol: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  pickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: C.GRAY200, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.WHITE },
+  pickerText: { flex: 1, fontSize: 13, color: C.GRAY800, fontWeight: '600' },
+  receiptRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, borderColor: C.GRAY200, borderStyle: 'dashed', backgroundColor: C.GHOST, marginBottom: 6 },
+  receiptText: { flex: 1, fontSize: 13, color: C.GRAY600, fontWeight: '600' },
+  lockedPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: C.GRAY200 },
+  lockedText: { fontSize: 9, color: C.GRAY600, fontWeight: '700', letterSpacing: 0.5 },
 
-  /* LABEL */
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.GRAY600,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-
-  /* TEXT FIELD */
-  field: {
-    backgroundColor: COLORS.WHITE,
-    borderWidth: 1.5,
-    borderColor: COLORS.GRAY200,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 14,
-  },
-  fieldInput: {
-    fontSize: 15,
-    color: COLORS.GRAY800,
-    fontWeight: '500',
-    padding: 0,
-  },
-
-  /* ROW */
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
-  },
-  rowItem: {
-    flex: 1,
-  },
-  pickerField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: COLORS.WHITE,
-    borderWidth: 1.5,
-    borderColor: COLORS.GRAY200,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  pickerText: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.GRAY800,
-    fontWeight: '600',
-  },
-  categoryEmoji: {
-    fontSize: 20,
-  },
-
-  /* AVATAR */
-  avatar: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: COLORS.WHITE,
-    fontWeight: '700',
-  },
-
-  /* RECEIPT */
-  receiptBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: COLORS.GRAY200,
-    borderStyle: 'dashed',
-    backgroundColor: COLORS.GHOST,
-  },
-  receiptBtnText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.GRAY600,
-  },
-  comingSoonPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: COLORS.GRAY200,
-  },
-  comingSoonText: {
-    fontSize: 9,
-    color: COLORS.GRAY600,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  /* SPLIT TABS */
-  splitTabs: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.GHOST,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 18,
-  },
-  splitTab: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  splitTabActive: {
-    backgroundColor: COLORS.WHITE,
-    shadowColor: '#0F2640',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  splitTabLocked: {
-    opacity: 0.5,
-  },
-  splitTabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.GRAY600,
-  },
-  splitTabTextActive: {
-    color: COLORS.CRIMSON,
-    fontWeight: '800',
-  },
-  splitTabTextLocked: {
-    color: COLORS.GRAY400,
-  },
+  /* METHOD TABS */
+  methodTabs: { flexDirection: 'row', backgroundColor: C.GHOST, borderRadius: 12, padding: 4, marginBottom: 10 },
+  methodTab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+  methodTabActive: { backgroundColor: C.WHITE, shadowColor: '#0F2640', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  methodTabText: { fontSize: 12, fontWeight: '600', color: C.GRAY600 },
+  methodTabTextActive: { color: C.CRIMSON, fontWeight: '800' },
+  methodDesc: { fontSize: 11, color: C.GRAY400, fontStyle: 'italic', marginBottom: 18, textAlign: 'center' },
 
   /* PARTICIPANTS */
-  participantsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  participantsCount: {
-    fontSize: 11,
-    color: COLORS.GRAY400,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  participantList: {
-    backgroundColor: COLORS.WHITE,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.GRAY200,
-    overflow: 'hidden',
-  },
-  participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  participantRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.GRAY100,
-  },
-  participantInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  participantName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.GRAY800,
-  },
-  participantShare: {
-    fontSize: 11,
-    color: COLORS.GRAY600,
-    marginTop: 2,
-  },
-  checkbox: {
-    width: 22, height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: COLORS.GRAY400,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: COLORS.CRIMSON,
-    borderColor: COLORS.CRIMSON,
-  },
+  partHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  partCount: { fontSize: 11, color: C.GRAY400, fontWeight: '600' },
+  partList: { borderWidth: 1, borderColor: C.GRAY200, borderRadius: 12, overflow: 'hidden', backgroundColor: C.WHITE },
+  partRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, gap: 10, minHeight: 58 },
+  partRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F0F2F5' },
+  partInfo: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  partName: { fontSize: 14, fontWeight: '700', color: C.GRAY800 },
+  partNameOff: { color: C.GRAY400 },
+  partShare: { fontSize: 11, color: C.GRAY600, marginTop: 2 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: C.GRAY400, alignItems: 'center', justifyContent: 'center' },
+  checkboxActive: { backgroundColor: C.CRIMSON, borderColor: C.CRIMSON },
 
-  /* SUM INDICATOR */
-  sumIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginTop: 14,
-  },
-  sumOk: {
-    backgroundColor: 'rgba(39,174,96,0.10)',
-  },
-  sumWarn: {
-    backgroundColor: 'rgba(243,156,18,0.10)',
-  },
-  sumText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  /* Inline inputs (exact / percent / shares) */
+  inlineInputWrap: { position: 'relative', flexDirection: 'row', alignItems: 'center' },
+  inlineInput: { width: 76, borderWidth: 1.5, borderColor: C.GRAY200, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, fontWeight: '700', color: C.GRAY800, textAlign: 'right' },
+  inlineUnit: { position: 'absolute', right: 8, fontSize: 13, color: C.GRAY400, fontWeight: '700' },
+  computedAmount: { fontSize: 11, color: C.GRAY600, fontWeight: '600', marginLeft: 4, minWidth: 50, textAlign: 'right' },
 
-  /* BOTTOM BUTTON */
-  bottomBtn: {
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    shadowColor: COLORS.CRIMSON,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  bottomBtnText: {
-    color: COLORS.WHITE,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  bottomBtnDisabled: {
-    backgroundColor: COLORS.GRAY200,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  bottomBtnTextDisabled: {
-    color: COLORS.GRAY400,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
+  /* INDICATOR */
+  indicator: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, marginTop: 12 },
+  indicatorText: { fontSize: 12, fontWeight: '700', flex: 1 },
 
-  /* MODAL */
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15,31,74,0.55)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: COLORS.WHITE,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingHorizontal: 22,
-    paddingBottom: 28,
-  },
-  modalHandle: {
-    width: 40, height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.GRAY200,
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.GRAY800,
-    marginBottom: 14,
-    letterSpacing: -0.2,
-  },
-  modalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  modalRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.GRAY100,
-  },
-  modalRowText: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.GRAY800,
-    fontWeight: '500',
-  },
+  /* SAVE BUTTON */
+  saveFullBtn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: C.CRIMSON, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 8 },
+  saveFullBtnText: { color: C.WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
+  saveFullBtnOff: { backgroundColor: C.GRAY200, shadowOpacity: 0, elevation: 0 },
+  saveFullBtnTextOff: { color: C.GRAY400, fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
 
-  /* CATEGORY GRID */
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  categoryTile: {
-    width: '23%',
-    aspectRatio: 1,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: COLORS.GRAY200,
-    backgroundColor: COLORS.GHOST,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  categoryTileSelected: {
-    borderColor: COLORS.CRIMSON,
-    backgroundColor: 'rgba(220,20,60,0.06)',
-  },
-  categoryTileEmoji: {
-    fontSize: 26,
-  },
-  categoryTileLabel: {
-    fontSize: 11,
-    color: COLORS.GRAY600,
-    fontWeight: '600',
-  },
+  /* MODALS */
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,31,74,0.55)', justifyContent: 'flex-end' },
+  bottomSheet: { backgroundColor: C.WHITE, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingHorizontal: 22, paddingBottom: 28 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.GRAY200, alignSelf: 'center', marginBottom: 14 },
+  sheetTitle: { fontSize: 16, fontWeight: '800', color: C.GRAY800, marginBottom: 14 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  sheetRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F0F2F5' },
+  sheetRowText: { flex: 1, fontSize: 14, color: C.GRAY800, fontWeight: '500' },
+  sheetRowTextSel: { color: C.CRIMSON, fontWeight: '700' },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  catTile: { width: '22%', aspectRatio: 1, borderRadius: 14, borderWidth: 1.5, borderColor: C.GRAY200, backgroundColor: C.GHOST, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  catTileSel: { borderColor: C.CRIMSON, backgroundColor: 'rgba(220,20,60,0.06)' },
+  catEmoji: { fontSize: 26 },
+  catTileLabel: { fontSize: 10, color: C.GRAY600, fontWeight: '600' },
+  catTileLabelSel: { color: C.CRIMSON, fontWeight: '700' },
+
+  /* AVATAR */
+  avatar: { alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: C.WHITE, fontWeight: '700' },
 });
 
 export default AddExpenseScreen;
