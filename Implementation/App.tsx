@@ -1,0 +1,554 @@
+
+import React, { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { authService } from './src/services/authService';
+import { apiService } from './src/services/apiService';
+import { biometricService } from './src/services/biometricService';
+
+// Auth screens
+import SplashScreen from './src/screens/auth/SplashScreen';
+import LoginScreen from './src/screens/auth/LoginScreen';
+import BiometricLockScreen from './src/screens/auth/BiometricLockScreen';
+import SignupScreen from './src/screens/auth/SignupScreen';
+import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
+
+// Main screens
+import HomeScreen from './src/screens/home/HomeScreen';
+import GroupDetailScreen from './src/screens/groups/GroupDetailScreen';
+import CreateGroupScreen from './src/screens/groups/CreateGroupScreen';
+import SelectGroupScreen from './src/screens/groups/SelectGroupScreen';
+import GroupSettingsScreen from './src/screens/groups/GroupSettingsScreen';
+import MemberHistoryScreen from './src/screens/groups/MemberHistoryScreen';
+
+// Expense screens
+import AddExpenseScreen from './src/screens/expenses/AddExpenseScreen';
+import ExpenseDetailScreen from './src/screens/expenses/ExpenseDetailScreen';
+import EditExpenseScreen from './src/screens/expenses/EditExpenseScreen';
+import ScanReceiptScreen from './src/screens/expenses/ScanReceiptScreen';
+
+// Settlement
+import SettleUpScreen from './src/screens/expenses/SettleUpScreen';
+
+// Tab screens (rendered inside HomeScreen — components used directly by HomeScreen)
+
+// Settings & Profile
+import NotificationSettingsScreen from './src/screens/settings/NotificationSettingsScreen';
+import SecurityPrivacyScreen from './src/screens/settings/SecurityPrivacyScreen';
+import EditProfileScreen from './src/screens/profile/EditProfileScreen';
+import { supabase } from './src/lib/supabase';
+
+// Analytics
+import AnalyticsScreen from './src/screens/analytics/AnalyticsScreen';
+import ExportScreen from './src/screens/analytics/ExportScreen';
+
+/* ─── ROUTE TYPES ──────────────────────────────────────────── */
+type Screen =
+  | 'splash'
+  | 'login'
+  | 'signup'
+  | 'verify-email'
+  | 'forgot'
+  | 'home'
+  | 'create-group'
+  | 'group'
+  | 'group-settings'
+  | 'member-history'
+  | 'select-group'
+  | 'add-expense'
+  | 'expense-detail'
+  | 'edit-expense'
+  | 'settle-up'
+  | 'scan-receipt'
+  | 'notification-settings'
+  | 'security-privacy'
+  | 'edit-profile'
+  | 'analytics'
+  | 'export'
+  | 'biometric-lock';
+
+type Tab = 'home' | 'friends' | 'groups' | 'activity' | 'profile';
+
+interface GroupContext {
+  groupId: string;
+  groupName: string;
+  groupEmoji?: string;
+  groupCurrency: string;
+  members: Array<{ id: string; name: string; avatarColor: string; balance: number; role: 'admin' | 'member' }>;
+  myUserId: string;
+}
+
+/* ─── INNER NAVIGATOR ──────────────────────────────────────── */
+function AppNavigator() {
+  const { user, loading, signOut, refreshAuth, biometricLocked, unlockBiometric, enableBiometricLogin } = useAuth();
+  const [screen, setScreen] = useState<Screen>('splash');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeExpenseId, setActiveExpenseId] = useState<string | null>(null);
+  const [activeMemberId, _setActiveMemberId] = useState<string | null>(null);
+  const [activeMemberName, _setActiveMemberName] = useState<string>('');
+  const [activeMemberColor, _setActiveMemberColor] = useState<string>('#1A2B5F');
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string>('');
+  const [groupContext, setGroupContext] = useState<GroupContext | null>(null);
+  const [addExpenseSource, setAddExpenseSource] = useState<'group' | 'select-group'>('group');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Once Supabase finishes loading the session, go to the right screen
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        setScreen(biometricLocked ? 'biometric-lock' : 'home');
+      } else {
+        setScreen('login');
+      }
+    }
+  }, [user, loading, biometricLocked]);
+
+  /* ─── SPLASH shown while auth loads ─── */
+  if (screen === 'splash' || loading) {
+    return <SplashScreen onDone={() => {}} />;
+  }
+
+  /* ─── BIOMETRIC LOCK ─── */
+  if (screen === 'biometric-lock') {
+    return (
+      <BiometricLockScreen
+        userName={user?.name ?? ''}
+        onUnlocked={async () => {
+          const success = await unlockBiometric();
+          if (!success) throw new Error('failed');
+        }}
+        onUsePassword={async () => {
+          await signOut();
+        }}
+      />
+    );
+  }
+
+  /* ─── AUTH SCREENS ─── */
+
+  if (screen === 'signup') {
+    return (
+      <SignupScreen
+        onGoToLogin={() => setScreen('login')}
+        onSignup={async (data) => {
+          const { needsVerification } = await authService.signUp(
+            data.email,
+            data.password,
+            data.name,
+          );
+          if (needsVerification) {
+            setPendingVerifyEmail(data.email);
+            setScreen('verify-email');
+          }
+          // If needsVerification is false, useEffect above detects session and goes to 'home'
+        }}
+        onGoogleSignup={() => console.log('google signup')}
+        onAppleSignup={() => console.log('apple signup')}
+        onOpenTerms={() => console.log('terms')}
+        onOpenPrivacy={() => console.log('privacy')}
+      />
+    );
+  }
+
+  if (screen === 'verify-email') {
+    return (
+      <VerifyEmailScreen
+        email={pendingVerifyEmail}
+        onGoToLogin={() => setScreen('login')}
+        onResend={async () => {
+          await authService.resendVerification(pendingVerifyEmail);
+        }}
+      />
+    );
+  }
+
+  if (screen === 'forgot') {
+    return (
+      <ForgotPasswordScreen
+        onGoToLogin={() => setScreen('login')}
+        onSubmit={async (email) => {
+          await authService.resetPassword(email);
+        }}
+      />
+    );
+  }
+
+  /* ─── EXPENSE SCREENS ─── */
+
+  if (screen === 'select-group') {
+    return (
+      <SelectGroupScreen
+        onBack={() => setScreen('home')}
+        onSelect={(info) => {
+          setGroupContext(info);
+          setAddExpenseSource('select-group');
+          setScreen('add-expense');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'add-expense') {
+    return (
+      <AddExpenseScreen
+        groupName={groupContext?.groupName ?? ''}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        members={groupContext?.members ?? []}
+        myUserId={groupContext?.myUserId ?? ''}
+        onBack={() => setScreen(addExpenseSource === 'select-group' ? 'select-group' : 'group')}
+        onSave={async (expense) => {
+          if (!groupContext) return;
+          try {
+            await apiService.addExpense(groupContext.groupId, expense);
+          } catch (err: any) {
+            console.error('Failed to save expense:', err.message);
+          }
+          setScreen(addExpenseSource === 'select-group' ? 'home' : 'group');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'expense-detail') {
+    return (
+      <ExpenseDetailScreen
+        expenseId={activeExpenseId ?? ''}
+        onBack={() => setScreen('group')}
+        onEdit={(id) => {
+          setActiveExpenseId(id);
+          setScreen('edit-expense');
+        }}
+        onDelete={() => setScreen('group')}
+      />
+    );
+  }
+
+  if (screen === 'edit-expense') {
+    return (
+      <EditExpenseScreen
+        expenseId={activeExpenseId ?? ''}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        members={groupContext?.members ?? []}
+        myUserId={groupContext?.myUserId ?? ''}
+        onBack={() => setScreen('expense-detail')}
+        onSave={() => setScreen('group')}
+      />
+    );
+  }
+
+if (screen === 'scan-receipt') {
+    return (
+        <ScanReceiptScreen
+            onBack={() => setScreen('home')}
+            onCapture={(uri, text) => {       // 👈 receive text here
+                console.log('Receipt captured:', uri);
+                console.log('Extracted text:', text);
+                // TODO: pass text to AddExpenseScreen to prefill fields
+                setScreen('add-expense');
+            }}
+            onManualEntry={() => setScreen('add-expense')}
+        />
+    );
+}
+
+
+  /* ─── SETTLEMENT ─── */
+
+  if (screen === 'settle-up') {
+    return (
+      <SettleUpScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        groupName={groupContext?.groupName ?? ''}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        onBack={() => setScreen('group')}
+        onSettle={async (settlement) => {
+          const gid = groupContext?.groupId ?? activeGroupId;
+          if (!gid) return;
+          try {
+            await apiService.recordSettlement(gid, settlement);
+          } catch (err: any) {
+            console.error('Failed to record settlement:', err.message);
+          }
+          setScreen('group');
+        }}
+      />
+    );
+  }
+
+  /* ─── GROUP SCREENS ─── */
+
+  if (screen === 'create-group') {
+    return (
+      <CreateGroupScreen
+        onBack={() => setScreen('home')}
+        onCreate={async (group) => {
+          try {
+            await apiService.createGroup({
+              name: group.name,
+              emoji: group.emoji,
+              currency: group.currency,
+              memberIds: group.memberIds,
+            });
+          } catch (err: any) {
+            console.error('Failed to create group:', err.message);
+          }
+          setRefreshKey(k => k + 1);
+          setScreen('home');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'group-settings') {
+    return (
+      <GroupSettingsScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        groupName={groupContext?.groupName ?? ''}
+        groupEmoji={groupContext?.groupEmoji ?? '👥'}
+        groupCurrency={groupContext?.groupCurrency ?? 'NPR'}
+        members={groupContext?.members ?? []}
+        myUserId={groupContext?.myUserId ?? ''}
+        onBack={() => setScreen('group')}
+        onSave={() => setScreen('group')}
+        onInviteMember={() => {}}
+        onRemoveMember={() => {}}
+        onPromoteMember={() => {}}
+        onDeleteGroup={() => {
+          setRefreshKey(k => k + 1);
+          setScreen('home');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'member-history') {
+    return (
+      <MemberHistoryScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        memberId={activeMemberId ?? ''}
+        memberName={activeMemberName}
+        memberColor={activeMemberColor}
+        currency={groupContext?.groupCurrency ?? 'NPR'}
+        onBack={() => setScreen('group')}
+      />
+    );
+  }
+
+  if (screen === 'group') {
+    return (
+      <GroupDetailScreen
+        groupId={activeGroupId ?? undefined}
+        onBack={() => setScreen('home')}
+        onAddExpense={(info) => {
+          setGroupContext(info);
+          setAddExpenseSource('group');
+          setScreen('add-expense');
+        }}
+        onSettleUp={(info) => {
+          setGroupContext(prev => prev
+            ? { ...prev, ...info }
+            : { ...info, members: [], myUserId: '' }
+          );
+          setScreen('settle-up');
+        }}
+        onExpenseTap={(id) => {
+          setActiveExpenseId(id);
+          setScreen('expense-detail');
+        }}
+        onOpenSettings={(info) => {
+          setGroupContext({
+            groupId: info.groupId,
+            groupName: info.groupName,
+            groupEmoji: info.groupEmoji,
+            groupCurrency: info.groupCurrency,
+            members: info.members,
+            myUserId: info.myUserId,
+          });
+          setScreen('group-settings');
+        }}
+      />
+    );
+  }
+
+  /* ─── ANALYTICS ─── */
+
+  if (screen === 'analytics') {
+    return (
+      <AnalyticsScreen
+        groupId={groupContext?.groupId ?? activeGroupId ?? ''}
+        groupName={groupContext?.groupName ?? ''}
+        onBack={() => setScreen('group')}
+        onExport={() => setScreen('export')}
+      />
+    );
+  }
+
+  if (screen === 'export') {
+    return (
+      <ExportScreen
+        groupName={groupContext?.groupName ?? ''}
+        onBack={() => setScreen('analytics')}
+        onExport={(format, scope) => {
+          console.log('Export:', format, scope);
+        }}
+      />
+    );
+  }
+
+  /* ─── SETTINGS & PROFILE ─── */
+
+  if (screen === 'notification-settings') {
+    return (
+      <NotificationSettingsScreen
+        onBack={() => setScreen('home')}
+        onSave={(prefs) => console.log('Notification prefs:', prefs)}
+      />
+    );
+  }
+
+  if (screen === 'security-privacy') {
+    return (
+      <SecurityPrivacyScreen
+        onBack={() => setScreen('home')}
+      />
+    );
+  }
+
+  if (screen === 'edit-profile') {
+    return (
+      <EditProfileScreen
+        avatarUrl={user?.avatarUrl}
+        onBack={() => setScreen('home')}
+        onSave={async (data) => {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (!authUser) return;
+
+          let avatarUrl: string | undefined;
+          if (data.avatarUri && !data.avatarUri.startsWith('http')) {
+            try {
+              const response = await fetch(data.avatarUri);
+              const blob = await response.blob();
+              const ext = data.avatarUri.split('.').pop()?.split('?')[0] ?? 'jpg';
+              const filePath = `${authUser.id}/avatar.${ext}`;
+              const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, blob, {
+                  contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+                  upsert: true,
+                });
+              if (!uploadError) {
+                const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+                avatarUrl = urlData.publicUrl;
+              }
+            } catch (e: any) {
+              console.error('Avatar upload failed:', e.message);
+            }
+          } else if (data.avatarUri?.startsWith('http')) {
+            // EditProfileScreen already uploaded; strip cache-bust param before saving to DB
+            avatarUrl = data.avatarUri.split('?')[0];
+          }
+
+          await supabase
+            .from('profiles')
+            .update({
+              full_name: data.name,
+              email: data.email,
+              ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+            })
+            .eq('user_id', authUser.id);
+
+          await refreshAuth();
+          setRefreshKey(k => k + 1);
+          setScreen('home');
+        }}
+      />
+    );
+  }
+
+  /* ─── HOME (with tab handling) ─── */
+
+  if (screen === 'home') {
+    return (
+      <HomeScreen
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        refreshKey={refreshKey}
+        onGroupTap={(id) => {
+          setActiveGroupId(id);
+          setScreen('group');
+        }}
+        onAddExpense={() => {
+          setGroupContext(null);
+          setScreen('select-group');
+        }}
+        onScanReceipt={() => setScreen('scan-receipt')}
+        onCreateGroup={() => setScreen('create-group')}
+        onOpenNotifications={() => setActiveTab('activity')}
+        onEditProfile={() => setScreen('edit-profile')}
+        onNotificationSettings={() => setScreen('notification-settings')}
+        onSecurityPrivacy={() => setScreen('security-privacy')}
+        onLogout={async () => {
+          await signOut();
+          // useEffect above detects user → null and goes to 'login'
+        }}
+      />
+    );
+  }
+
+  /* ─── LOGIN (default fallback) ─── */
+  return (
+    <LoginScreen
+      onLogin={async () => {
+        // After successful password login, offer to enable biometrics if not yet set up
+        const available = await biometricService.isAvailable();
+        const alreadyEnabled = await biometricService.isEnabled();
+        if (available && !alreadyEnabled) {
+          Alert.alert(
+            'Enable Biometric Login',
+            'Use Face ID or Fingerprint to unlock the app next time?',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              {
+                text: 'Enable',
+                onPress: () => enableBiometricLogin(),
+              },
+            ],
+          );
+        }
+      }}
+      onGoToSignup={() => setScreen('signup')}
+      onForgotPassword={() => setScreen('forgot')}
+      onBiometricLogin={async () => {
+        const enabled = await biometricService.isEnabled();
+        if (!enabled) {
+          Alert.alert(
+            'Biometric Login Unavailable',
+            'Please log in with your password first to set up biometric login.',
+          );
+          return;
+        }
+        // Biometric is enabled but session is gone — just guide them to password
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please log in with your password to continue.',
+        );
+      }}
+      onGoogleLogin={() => console.log('google login — not implemented')}
+      onAppleLogin={() => console.log('apple login — not implemented')}
+    />
+  );
+}
+
+/* ─── ROOT ─────────────────────────────────────────────────── */
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
