@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
 import { apiService } from '../../services/apiService';
+import { useTheme } from '../../context/ThemeContext';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
 const COLORS = {
@@ -162,6 +163,7 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
 }) => {
   type Step = 'pick' | 'form' | 'done';
   const [step, setStep] = useState<Step>('pick');
+  const { colors } = useTheme();
   const [creditors, setCreditors] = useState<Creditor[]>([]);
   const [loadingCreditors, setLoadingCreditors] = useState(true);
   const [creditorError, setCreditorError] = useState<string | null>(null);
@@ -242,7 +244,7 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
   const isPartial = selected && amountNum > 0 && amountNum < selected.amountOwed;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.BLUE_DARK} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -284,17 +286,17 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
               STEP 1 — PICK A CREDITOR
               ═══════════════════════════════════════════════════ */}
           {step === 'pick' && (
-            <View style={styles.sheet}>
+            <View style={[styles.sheet, { backgroundColor: colors.background }]}>
               {loadingCreditors ? (
-                <View style={styles.emptyState}>
+                <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
                   <Text style={{ color: COLORS.GRAY600, fontSize: 14 }}>Loading…</Text>
                 </View>
               ) : creditorError ? (
-                <View style={styles.emptyState}>
+                <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
                   <Text style={{ color: COLORS.CRIMSON, fontSize: 13, textAlign: 'center' }}>{creditorError}</Text>
                 </View>
               ) : creditors.length === 0 ? (
-                <View style={styles.emptyState}>
+                <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
                   <Text style={styles.emptyEmoji}>🎉</Text>
                   <Text style={styles.emptyTitle}>You're all squared up</Text>
                   <Text style={styles.emptyDesc}>
@@ -318,7 +320,7 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
               ) : (
                 <>
                   {/* Total owed summary */}
-                  <View style={styles.summaryCard}>
+                  <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
                     <Text style={styles.summaryLabel}>YOU OWE IN TOTAL</Text>
                     <Text style={styles.summaryAmount}>
                       {fmt(totalOwed)} <Text style={styles.summaryCurrency}>{groupCurrency}</Text>
@@ -339,7 +341,7 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
 
                   {/* Creditor list */}
                   <Text style={styles.sectionLabel}>WHO ARE YOU PAYING?</Text>
-                  <View style={styles.creditorList}>
+                  <View style={[styles.creditorList, { backgroundColor: colors.card }]}>
                     {creditors.map((c, idx) => {
                       const isLast = idx === creditors.length - 1;
                       return (
@@ -379,7 +381,7 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
           {step === 'form' && selected && (
             <View style={styles.sheet}>
               {/* Recipient card */}
-              <View style={styles.recipientCard}>
+              <View style={[styles.recipientCard, { backgroundColor: colors.card }]}>
                 <Avatar member={selected} size={52} />
                 <View style={styles.recipientInfo}>
                   <Text style={styles.recipientLabel}>PAYING</Text>
@@ -553,7 +555,7 @@ const SettleUpScreen: React.FC<SettleUpScreenProps> = ({
                 </Text>
 
                 {/* Detail card */}
-                <View style={styles.detailCard}>
+                <View style={[styles.detailCard, { backgroundColor: colors.card }]}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailKey}>To</Text>
                     <View style={styles.detailValueWithAvatar}>

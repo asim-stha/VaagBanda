@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { authService } from './src/services/authService';
 import { apiService } from './src/services/apiService';
 import { biometricService } from './src/services/biometricService';
+import { useTheme } from './src/context/ThemeContext';
 
 // Auth screens
 import SplashScreen from './src/screens/auth/SplashScreen';
@@ -39,6 +41,7 @@ import ProfileScreen from './src/screens/tabs/ProfileScreen';
 // Settings & Profile
 import NotificationSettingsScreen from './src/screens/settings/NotificationSettingsScreen';
 import SecurityPrivacyScreen from './src/screens/settings/SecurityPrivacyScreen';
+import AppearanceScreen from './src/screens/settings/AppearanceScreen';
 import EditProfileScreen from './src/screens/profile/EditProfileScreen';
 import { supabase } from './src/lib/supabase';
 
@@ -66,6 +69,7 @@ type Screen =
   | 'scan-receipt'
   | 'notification-settings'
   | 'security-privacy'
+  | 'appearance'
   | 'edit-profile'
   | 'analytics'
   | 'export'
@@ -85,6 +89,7 @@ interface GroupContext {
 /* ─── INNER NAVIGATOR ──────────────────────────────────────── */
 function AppNavigator() {
   const { user, loading, signOut, refreshAuth, biometricLocked, unlockBiometric, enableBiometricLogin } = useAuth();
+  const { colors, isDark } = useTheme();
   const [screen, setScreen] = useState<Screen>('splash');
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -419,6 +424,14 @@ if (screen === 'scan-receipt') {
     );
   }
 
+  if (screen === 'appearance') {
+    return (
+      <AppearanceScreen
+        onBack={() => setScreen('home')}
+      />
+    );
+  }
+
   if (screen === 'edit-profile') {
     return (
       <EditProfileScreen
@@ -492,6 +505,7 @@ if (screen === 'scan-receipt') {
         onEditProfile={() => setScreen('edit-profile')}
         onNotificationSettings={() => setScreen('notification-settings')}
         onSecurityPrivacy={() => setScreen('security-privacy')}
+        onAppearance={() => setScreen('appearance')}
         onLogout={async () => {
           await signOut();
           // useEffect above detects user → null and goes to 'login'
@@ -548,9 +562,11 @@ if (screen === 'scan-receipt') {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

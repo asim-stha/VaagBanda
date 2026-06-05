@@ -7,7 +7,6 @@ import {
     TouchableOpacity,
     Image,
     Modal,
-    Alert,
     ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { apiService } from '../../services/apiService';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../context/ThemeContext';
 import Svg, { Path, Line, Polyline } from 'react-native-svg';
 
 /* ─── BRAND TOKENS ─────────────────────────────────────────── */
@@ -137,6 +137,7 @@ interface SettingsItem {
 interface ProfileScreenProps {
     user?: UserInfo;
     onEditProfile?: () => void;
+    onAppearance?: () => void;
     onNotificationPrefs?: () => void;
     onDefaultCurrency?: () => void;
     onSecurityPrivacy?: () => void;
@@ -157,25 +158,29 @@ const CURRENCIES = [
 /* ─── SETTINGS ROW ─────────────────────────────────────────── */
 const SettingsRow = ({
     icon, label, value, onPress, isLast = false,
-}: SettingsItem & { isLast?: boolean }) => (
-    <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.7}
-        style={[styles.settingsRow, !isLast && styles.settingsRowBorder]}
-    >
-        <Text style={styles.settingsIcon}>{icon}</Text>
-        <Text style={styles.settingsLabel}>{label}</Text>
-        <View style={styles.settingsRight}>
-            {value && <Text style={styles.settingsValue}>{value}</Text>}
-            <Icon name="chevron" size={16} color={COLORS.GRAY400} />
-        </View>
-    </TouchableOpacity>
-);
+}: SettingsItem & { isLast?: boolean }) => {
+    const { colors } = useTheme();
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={[styles.settingsRow, !isLast && styles.settingsRowBorder]}
+        >
+            <Text style={styles.settingsIcon}>{icon}</Text>
+            <Text style={[styles.settingsLabel, { color: colors.text }]}>{label}</Text>
+            <View style={styles.settingsRight}>
+                {value && <Text style={styles.settingsValue}>{value}</Text>}
+                <Icon name="chevron" size={16} color={COLORS.GRAY400} />
+            </View>
+        </TouchableOpacity>
+    );
+};
 
 /* ─── MAIN COMPONENT ───────────────────────────────────────── */
 const ProfileScreen: React.FC<ProfileScreenProps> = ({
     user,
     onEditProfile,
+    onAppearance,
     onNotificationPrefs,
     onDefaultCurrency,
     onSecurityPrivacy,
@@ -184,13 +189,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const { user: authUser } = useAuth();
     const [stats, setStats] = useState({ groupCount: 0, expenseCount: 0, netBalance: 0 });
+    const { colors, isDark } = useTheme();
     const [defaultCurrency, setDefaultCurrency] = useState('NPR');
     const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
     // avatarUrlRef persists across re-renders without triggering extra fetches.
     // Seed it from the module-level cache (survives tab switches) if the cached
     // entry belongs to the current user, otherwise fall back to authUser.
-    const cachedForUser = _avatarCache?.userId === authUser?.id ? _avatarCache.url : null;
+    const cachedForUser = _avatarCache?.userId === authUser?.id ? _avatarCache?.url : null;
     const avatarUrlRef = useRef<string | null>(cachedForUser ?? authUser?.avatarUrl ?? null);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(avatarUrlRef.current);
 
@@ -256,13 +262,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         { icon: '👤', label: 'Edit Profile', onPress: onEditProfile },
         { icon: '🔔', label: 'Notification Preferences', onPress: onNotificationPrefs },
         { icon: '💱', label: 'Default Currency', value: defaultCurrency, onPress: () => setShowCurrencyModal(true) },
-        { icon: '🎨', label: 'Appearance', value: 'Coming Soon', onPress: () => Alert.alert('Coming Soon', 'Light, Dark, and System Default themes will be available in a future update.') },
+        { icon: '🎨', label: 'Appearance', onPress: onAppearance },
         { icon: '🔒', label: 'Security & Privacy', onPress: onSecurityPrivacy },
         { icon: 'ℹ️', label: 'About VaagBanda', onPress: onAbout, isLast: true },
     ];
 
     return (
-        <View style={styles.root}>
+        <View style={[styles.root, { backgroundColor: colors.background }]}>
             <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
                 <LinearGradient
                     colors={[COLORS.BLUE_DARK, COLORS.CRIMSON_DARK]}
@@ -284,14 +290,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </TouchableOpacity>
                 </LinearGradient>
 
-                <View style={styles.statsRow}>
+                <View style={[styles.statsRow, { backgroundColor: colors.card }]}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{stats.groupCount}</Text>
+                        <Text style={[styles.statNumber, { color: colors.text }]}>{stats.groupCount}</Text>
                         <Text style={styles.statLabel}>Groups</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>{stats.expenseCount}</Text>
+                        <Text style={[styles.statNumber, { color: colors.text }]}>{stats.expenseCount}</Text>
                         <Text style={styles.statLabel}>Expenses</Text>
                     </View>
                     <View style={styles.statDivider} />
@@ -303,7 +309,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </View>
                 </View>
 
-                <View style={styles.settingsCard}>
+                <View style={[styles.settingsCard, { backgroundColor: colors.card }]}>
                     <Text style={styles.settingsHeader}>SETTINGS</Text>
                     {settingsItems.map((item, idx) => (
                         <SettingsRow key={item.label} {...item} isLast={idx === settingsItems.length - 1} />
@@ -320,7 +326,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     <Text style={styles.versionSub}>Scan · Split · Settle</Text>
                 </View>
 
-                <TouchableOpacity onPress={onLogout} activeOpacity={0.85} style={styles.logoutBtn}>
+                <TouchableOpacity onPress={onLogout} activeOpacity={0.85} style={[styles.logoutBtn, { backgroundColor: colors.card }]}>
                     <Icon name="logout" size={18} color={COLORS.CRIMSON} />
                     <Text style={styles.logoutText}>Sign Out</Text>
                 </TouchableOpacity>
@@ -339,7 +345,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     onPress={() => setShowCurrencyModal(false)}
                     style={styles.modalBackdrop}
                 >
-                    <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+                    <TouchableOpacity activeOpacity={1} style={[styles.modalSheet, { backgroundColor: colors.card }]}>
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>Choose Default Currency</Text>
                         {CURRENCIES.map((c, idx) => {
@@ -368,7 +374,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
 /* ─── STYLES ───────────────────────────────────────────────── */
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: COLORS.GHOST },
+    root: { flex: 1 },
 
     /* HEADER */
     header: {
@@ -574,4 +580,4 @@ const styles = StyleSheet.create({
     currencyLabelModal: { fontSize: 14, color: COLORS.GRAY600, fontWeight: '500' },
 });
 
-export default React.memo(ProfileScreen);
+export default ProfileScreen;

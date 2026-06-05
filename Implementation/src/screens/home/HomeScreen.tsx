@@ -187,6 +187,7 @@ interface HomeScreenProps {
   onNotificationSettings?: () => void;
   onEditProfile?: () => void;
   onSecurityPrivacy?: () => void;
+  onAppearance?: () => void;
   onLogout?: () => void;
   refreshKey?: number;
 }
@@ -297,6 +298,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onNotificationSettings,
   onEditProfile,
   onSecurityPrivacy,
+  onAppearance,
   onLogout,
   refreshKey = 0,
 }) => {
@@ -909,6 +911,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <ProfileScreen
           user={displayUser}
           onEditProfile={onEditProfile}
+          onAppearance={() => onAppearance?.()}
           onNotificationPrefs={onNotificationSettings}
           onSecurityPrivacy={onSecurityPrivacy}
           onAbout={() => {
